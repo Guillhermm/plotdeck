@@ -17,6 +17,7 @@
   var planner = window.PlotDeckPlan;
   var plotter = window.PlotDeckPlot;
   var deck = window.PlotDeckDeck;
+  var viewer = window.PlotDeckView;
 
   var state = {
     host: null,
@@ -58,7 +59,8 @@
     '  word-break: break-all; margin-bottom: 10px; }',
     'svg { display: block; background: #0d1117; border-radius: 5px; }',
     '.sliders { margin-top: 10px; display: grid; gap: 7px; }',
-    '.slider { display: grid; grid-template-columns: 58px 1fr 44px; align-items: center; gap: 8px; }',
+    '.slider { display: grid; grid-template-columns: 62px 1fr 44px; align-items: center; gap: 8px; }',
+    '.axes { margin-top: 12px; padding-top: 10px; border-top: 1px solid #1b2430; }',
     '.slider span { font: 12px ui-monospace, Menlo, monospace; color: #9fb0c0; }',
     '.slider output { font: 11px ui-monospace, Menlo, monospace; color: #e6edf3; text-align: right; }',
     'input[type=range] { width: 100%; accent-color: #4f9dfd; }',
@@ -66,11 +68,6 @@
     '.figure-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }',
     '.figure-head .spacer { flex: 1; }',
     '.warn { color: #e3b341; font-size: 11px; }',
-    '.domain { display: flex; align-items: center; gap: 6px; margin-top: 10px;',
-    '  color: #7d8b9a; font-size: 11px; }',
-    '.domain input { width: 62px; background: #0d1117; color: #e6edf3;',
-    '  border: 1px solid #2c3a4a; border-radius: 4px; padding: 3px 5px;',
-    '  font: 11px ui-monospace, Menlo, monospace; }',
     'button.mini { padding: 3px 8px; font-size: 11px; }',
     '.nav { display: flex; align-items: center; gap: 8px; padding: 10px 14px;',
     '  border-top: 1px solid #222c38; flex: none; }',
@@ -112,14 +109,21 @@
   }
 
   function drawPlot(slide) {
-    var points = plotter.sample(slide.plan, slide.values);
+    var domain = viewer.zoom(slide.baseDomain, viewer.factorFor(slide.view.x));
+    var points = plotter.sample(
+      { axis: slide.plan.axis, ast: slide.plan.ast, domain: domain },
+      slide.values
+    );
     // The frame is measured once per slide and then held, so moving a scale
     // parameter moves the curve instead of silently rescaling the axis.
-    if (!slide.frame) {
+    if (!slide.baseFrame) {
       var first = plotter.geometry(points, BOX);
-      slide.frame = first ? first.range : null;
+      slide.baseFrame = first ? first.range : null;
     }
-    var geo = plotter.geometry(points, BOX, slide.frame);
+    var frame = slide.baseFrame
+      ? viewer.zoom(slide.baseFrame, viewer.factorFor(slide.view.y))
+      : null;
+    var geo = plotter.geometry(points, BOX, frame);
     var svg = svgEl('svg', {
       width: BOX.width, height: BOX.height,
       viewBox: '0 0 ' + BOX.width + ' ' + BOX.height
@@ -225,61 +229,77 @@
       var drawn = drawPlot(slide);
       figure.replaceChildren(drawn.svg);
       warn.textContent = drawn.geo && drawn.geo.escapes ? 'curve leaves the frame' : '';
-      var range = drawn.geo
-        ? plotter.format(drawn.geo.range.min) + ' to ' + plotter.format(drawn.geo.range.max)
-        : 'none';
-      meta.textContent = slide.plan.label + ' frame: ' + range
-        + (slide.plan.axisChoice === 'fallback' ? '   (axis guessed)' : '');
+      if (!drawn.geo) {
+        meta.textContent = 'nothing finite in this window';
+        return;
+      }
+      meta.textContent = slide.plan.axis + ': '
+        + plotter.format(drawn.geo.xRange.min) + ' to ' + plotter.format(drawn.geo.xRange.max)
+        + '    ' + slide.plan.label + ': '
+        + plotter.format(drawn.geo.range.min) + ' to ' + plotter.format(drawn.geo.range.max)
+        + (slide.plan.axisChoice === 'fallback' ? '    (axis guessed)' : '');
     }
 
     refit.addEventListener('click', function () {
-      slide.frame = null;
-      redraw();
+      slide.baseFrame = null;
+      slide.view.y = 0;
+      goTo(state.index, 0);
     });
+
+    function sliderRow(name, config, onInput) {
+      var row = el('div', 'slider');
+      row.appendChild(el('span', null, name));
+      var input = document.createElement('input');
+      input.type = 'range';
+      input.min = String(config.min);
+      input.max = String(config.max);
+      input.step = String(config.step);
+      input.value = String(config.value);
+      var readout = document.createElement('output');
+      readout.textContent = config.readout(config.value);
+      input.addEventListener('input', function () {
+        var value = Number(input.value);
+        readout.textContent = config.readout(value);
+        onInput(value);
+        redraw();
+      });
+      row.appendChild(input);
+      row.appendChild(readout);
+      return row;
+    }
 
     if (slide.plan.sliders.length) {
       var sliders = el('div', 'sliders');
       slide.plan.sliders.forEach(function (config) {
-        var row = el('div', 'slider');
-        row.appendChild(el('span', null, config.name));
-        var input = document.createElement('input');
-        input.type = 'range';
-        input.min = String(config.min);
-        input.max = String(config.max);
-        input.step = String(config.step);
-        input.value = String(slide.values[config.name]);
-        var readout = document.createElement('output');
-        readout.textContent = plotter.format(slide.values[config.name]);
-        input.addEventListener('input', function () {
-          slide.values[config.name] = Number(input.value);
-          readout.textContent = plotter.format(slide.values[config.name]);
-          redraw();
-        });
-        row.appendChild(input);
-        row.appendChild(readout);
-        sliders.appendChild(row);
+        sliders.appendChild(sliderRow(config.name, {
+          min: config.min, max: config.max, step: config.step,
+          value: slide.values[config.name],
+          readout: plotter.format
+        }, function (value) {
+          slide.values[config.name] = value;
+        }));
       });
       card.appendChild(sliders);
     }
 
-    // Every slide gets at least these: the window on the axis.
-    var domain = el('div', 'domain');
-    domain.appendChild(el('span', null, slide.plan.axis + ' from'));
-    ['min', 'max'].forEach(function (key, position) {
-      if (position === 1) domain.appendChild(el('span', null, 'to'));
-      var input = document.createElement('input');
-      input.type = 'number';
-      input.step = 'any';
-      input.value = String(Math.round(slide.plan.domain[key] * 1000) / 1000);
-      input.addEventListener('change', function () {
-        var value = Number(input.value);
-        if (!Number.isFinite(value)) return;
-        slide.plan.domain[key] = value;
-        redraw();
-      });
-      domain.appendChild(input);
-    });
-    card.appendChild(domain);
+    // Every slide gets these: one span control per axis. They scale the window
+    // about its own centre, so the curve stays centred instead of drifting the
+    // way a pair of typed bounds lets it.
+    var axes = el('div', 'sliders axes');
+    var zoomConfig = function (position) {
+      return {
+        min: -viewer.STEPS, max: viewer.STEPS, step: 1, value: position,
+        readout: function (value) {
+          var factor = viewer.factorFor(value);
+          return (factor >= 100 || factor < 0.1 ? factor.toPrecision(2) : String(Math.round(factor * 100) / 100)) + 'x';
+        }
+      };
+    };
+    axes.appendChild(sliderRow(slide.plan.axis + ' range', zoomConfig(slide.view.x),
+      function (value) { slide.view.x = value; }));
+    axes.appendChild(sliderRow('y range', zoomConfig(slide.view.y),
+      function (value) { slide.view.y = value; }));
+    card.appendChild(axes);
 
     redraw();
     return card;
@@ -425,7 +445,10 @@
         element: item.element,
         source: item.source,
         plan: result.plan,
-        values: values
+        values: values,
+        baseDomain: { min: result.plan.domain.min, max: result.plan.domain.max },
+        baseFrame: null,
+        view: { x: 0, y: 0 }
       });
     });
   }

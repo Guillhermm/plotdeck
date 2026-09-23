@@ -47,10 +47,18 @@ page with a hundred equations costs the same as a page with one.
 
 ## Controls on a slide
 
-Every slide has the axis window: `x from … to …`. A slide only gets sliders when the
-equation actually has parameters, so `f(x)=1/(1+e^{-x})` has none and
-`f(x)=L/(1+e^{-k(x-x_0)})` has three. On the Wikipedia article for the logistic
-function, 11 of the 23 slides carry no parameters at all.
+A slide only gets parameter sliders when the equation has parameters, so
+`f(x)=1/(1+e^{-x})` has none and `f(x)=L/(1+e^{-k(x-x_0)})` has three. On the
+Wikipedia article for the logistic function, 11 of the 23 slides carry no parameters
+at all.
+
+Every slide, with parameters or without, gets a span control for each axis: **x range**
+and **y range**. Each one scales its window about the window's own centre, so the
+centre never moves and the curve cannot drift off to a corner the way a pair of typed
+bounds allows. One step is a constant ratio and the ends are 0.01x and 100x the
+measured span, which is four orders of magnitude on a control that typing two numbers
+cannot cover comfortably. The readout is the factor, and the line under the plot gives
+the resulting bounds on both axes.
 
 **The vertical frame is measured once per slide and then held.** This matters more
 than it sounds. If the axis is refitted on every redraw, a scale parameter stretches
@@ -60,7 +68,8 @@ were affected: every one changed the numbers, only 4 changed the picture. With t
 frame held, all 16 change the picture.
 
 When a curve grows past the held frame it is clipped at the edge, the slide says
-"curve leaves the frame", and **Refit** rescales to the current curve. Tick labels on
+"curve leaves the frame", and **Refit** measures the frame again from the current
+curve and returns the y range to 1x. Tick labels on
 both axes make the size of the change readable rather than implied.
 
 ## Measured yield
@@ -108,7 +117,7 @@ skipped: `trivial-expression`, `implicit-relation`, `chained-relation`,
 ## Development
 
 ```sh
-npm test          # 46 tests, node:test, no dependencies
+npm test          # 62 tests, node:test, no dependencies
 npm run icons     # regenerates src/images/*.png
 ```
 
@@ -118,4 +127,5 @@ npm run icons     # regenerates src/images/*.png
 - `src/lib/plot.js`: sampling and SVG geometry, pure.
 - `src/lib/extract.js`: the DOM sources.
 - `src/lib/deck.js`: navigation arithmetic and the swipe verdict, pure.
+- `src/lib/view.js`: the axis windows, scaled about their centre, pure.
 - `src/content/content.js`: the drawer, in a shadow root.

@@ -7,6 +7,7 @@ const FILES = [
   'src/lib/plot.js',
   'src/lib/extract.js',
   'src/lib/deck.js',
+  'src/lib/view.js',
   'src/content/content.js'
 ];
 
