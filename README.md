@@ -32,6 +32,19 @@ Four stages, each of which can be checked on its own.
    vertical lines, and the vertical range is clipped around the median so one
    asymptote cannot flatten the curve.
 
+## Moving through the deck
+
+One slide at a time, never a scrolling list. Only the current slide is built, so a
+page with a hundred equations costs the same as a page with one.
+
+- Arrow buttons in the footer, with a counter and a progress rail.
+- Left and right arrow keys, while the panel has focus. Escape closes it.
+- Swipe: drag horizontally across the slide. A mostly vertical drag scrolls the
+  slide instead, so a tall slide never flips to the next one by accident.
+- Both ends clamp rather than wrap, and the buttons disable there.
+- Slider positions belong to the slide, so they survive leaving and coming back.
+- "Show on page" scrolls the page to the equation and outlines it.
+
 ## Measured yield
 
 Live pages, Chrome 154. "Found" counts distinct expressions after deduplication.
@@ -77,7 +90,7 @@ skipped: `trivial-expression`, `implicit-relation`, `chained-relation`,
 ## Development
 
 ```sh
-npm test          # 40 tests, node:test, no dependencies
+npm test          # 46 tests, node:test, no dependencies
 npm run icons     # regenerates src/images/*.png
 ```
 
@@ -86,4 +99,5 @@ npm run icons     # regenerates src/images/*.png
 - `src/lib/plan.js`: axis choice, sliders, domain, and every rejection reason.
 - `src/lib/plot.js`: sampling and SVG geometry, pure.
 - `src/lib/extract.js`: the DOM sources.
+- `src/lib/deck.js`: navigation arithmetic and the swipe verdict, pure.
 - `src/content/content.js`: the drawer, in a shadow root.

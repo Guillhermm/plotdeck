@@ -6,6 +6,7 @@ const FILES = [
   'src/lib/plan.js',
   'src/lib/plot.js',
   'src/lib/extract.js',
+  'src/lib/deck.js',
   'src/content/content.js'
 ];
 
