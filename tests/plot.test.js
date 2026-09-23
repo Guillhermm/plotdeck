@@ -73,6 +73,57 @@ test('axis lines appear only when zero is in range', () => {
   assert.equal(offRange.axisX, null);
 });
 
+test('a frozen frame lets a scale parameter change the picture', () => {
+  const p = planFor('y=Lx');
+  const base = plot.geometry(plot.sample(p, { L: 1 }), BOX);
+  const bigger = plot.geometry(plot.sample(p, { L: 3.5 }), BOX, base.range);
+  assert.notEqual(bigger.paths.join(), base.paths.join());
+  assert.deepEqual(bigger.range, base.range, 'the frame must not move');
+  assert.equal(bigger.escapes, true);
+});
+
+test('without a frozen frame a scale parameter is invisible', () => {
+  const p = planFor('y=Lx');
+  const one = plot.geometry(plot.sample(p, { L: 1 }), BOX);
+  const many = plot.geometry(plot.sample(p, { L: 3.5 }), BOX);
+  assert.equal(many.paths.join(), one.paths.join(), 'this is the bug the frame fixes');
+});
+
+test('escapes is false while the curve fits', () => {
+  const p = planFor('y=Lx');
+  const base = plot.geometry(plot.sample(p, { L: 1 }), BOX);
+  const smaller = plot.geometry(plot.sample(p, { L: 0.5 }), BOX, base.range);
+  assert.equal(smaller.escapes, false);
+  assert.notEqual(smaller.paths.join(), base.paths.join());
+});
+
+test('ticks are round numbers inside the range', () => {
+  const values = plot.ticks(-0.08, 1.08, 4);
+  assert.deepEqual(values, [0, 0.5, 1]);
+  assert.ok(plot.ticks(-10, 10, 4).includes(0));
+  assert.ok(plot.ticks(0.01, 10, 4).every((v) => v >= 0.01 && v <= 10));
+});
+
+test('ticks survive a degenerate range', () => {
+  assert.ok(Array.isArray(plot.ticks(1, 1, 4)));
+  assert.ok(plot.ticks(0, 1e-9, 4).length <= 21);
+});
+
+test('unionRange takes the outer bounds', () => {
+  assert.deepEqual(plot.unionRange({ min: 0, max: 1 }, { min: -2, max: 0.5 }),
+    { min: -2, max: 1 });
+  assert.deepEqual(plot.unionRange(null, { min: 0, max: 1 }), { min: 0, max: 1 });
+});
+
+test('the plot area leaves room for the labels', () => {
+  const box = { width: 344, height: 176, padLeft: 40, padRight: 8, padTop: 10, padBottom: 20 };
+  const geo = plot.geometry(plot.sample(planFor('y=\\sin(x)'), {}), box);
+  assert.equal(geo.plot.left, 40);
+  assert.equal(geo.plot.width, 344 - 48);
+  assert.equal(geo.plot.height, 176 - 30);
+  assert.ok(geo.yTicks.every((t) => t.y >= 10 && t.y <= 156));
+});
+
 test('format keeps numbers short', () => {
   assert.equal(plot.format(3.14159), '3.142');
   assert.equal(plot.format(120000), '1.2e+5');

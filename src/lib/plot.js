@@ -55,35 +55,93 @@
     return { min: min - margin, max: max + margin };
   }
 
+  /** The smallest range containing both. */
+  function unionRange(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    return { min: Math.min(a.min, b.min), max: Math.max(a.max, b.max) };
+  }
+
+  /** A round step near span / count: 1, 2 or 5 times a power of ten. */
+  function niceStep(span, count) {
+    if (!(span > 0)) return 1;
+    var raw = span / (count || 4);
+    var magnitude = Math.pow(10, Math.floor(Math.log10(raw)));
+    var normalized = raw / magnitude;
+    var step = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+    return step * magnitude;
+  }
+
+  /** Round values inside [min, max], for axis labels. */
+  function ticks(min, max, count) {
+    var step = niceStep(max - min, count);
+    var out = [];
+    var first = Math.ceil(min / step) * step;
+    for (var value = first; value <= max + step * 1e-6; value += step) {
+      out.push(Math.abs(value) < step * 1e-6 ? 0 : value);
+      if (out.length > 20) break;
+    }
+    return out;
+  }
+
+  function padding(box) {
+    if (typeof box.pad === 'number') {
+      return { left: box.pad, right: box.pad, top: box.pad, bottom: box.pad };
+    }
+    return {
+      left: box.padLeft || 0, right: box.padRight || 0,
+      top: box.padTop || 0, bottom: box.padBottom || 0
+    };
+  }
+
   /**
    * Builds SVG path strings, broken wherever the curve leaves the view or the
    * value stops being finite, so poles are gaps rather than vertical lines.
+   *
+   * `frozen` holds the vertical frame still while a slider moves. It is used
+   * rather than the natural range because a scale parameter stretches the data
+   * and the natural axis by the same factor, so the drawing never changes. With
+   * the frame fixed, the curve visibly grows and leaves the top, and the tick
+   * labels stay put to say by how much. `escapes` reports that, so the caller
+   * can offer to refit.
    */
-  function geometry(points, box) {
-    var range = verticalRange(points);
-    if (!range) return null;
+  function geometry(points, box, frozen) {
+    var natural = verticalRange(points);
+    if (!natural) return null;
+    var range = frozen || natural;
     var xMin = points[0].x;
     var xMax = points[points.length - 1].x;
-    var width = box.width;
-    var height = box.height;
-    var pad = box.pad || 0;
-    var inner = { w: width - pad * 2, h: height - pad * 2 };
+    var pad = padding(box);
+    var inner = {
+      w: box.width - pad.left - pad.right,
+      h: box.height - pad.top - pad.bottom
+    };
 
-    var toX = function (x) { return pad + ((x - xMin) / (xMax - xMin)) * inner.w; };
-    var toY = function (y) { return pad + inner.h - ((y - range.min) / (range.max - range.min)) * inner.h; };
+    var toX = function (x) { return pad.left + ((x - xMin) / (xMax - xMin)) * inner.w; };
+    var toY = function (y) { return pad.top + inner.h - ((y - range.min) / (range.max - range.min)) * inner.h; };
 
     var paths = [];
     var current = [];
-    var slack = (range.max - range.min) * 2;
+    var span = range.max - range.min;
+    // Generous, so a curve that grows past the frame is still drawn up to the
+    // clip edge rather than vanishing.
+    var slack = span * 6;
+    var jump = span * 4;
+    var previous = null;
     for (var i = 0; i < points.length; i += 1) {
       var p = points[i];
       var visible = Number.isFinite(p.y)
         && p.y > range.min - slack && p.y < range.max + slack;
-      if (!visible) {
+      // A step this large between neighbours is a pole, not a steep curve.
+      var broke = previous !== null && Number.isFinite(p.y)
+        && Math.abs(p.y - previous) > jump;
+      if (!visible || broke) {
         if (current.length > 1) paths.push(current.join(' '));
         current = [];
-        continue;
+        previous = Number.isFinite(p.y) ? p.y : null;
+        if (!visible) continue;
       }
+      previous = p.y;
       current.push((current.length ? 'L' : 'M') + toX(p.x).toFixed(2) + ',' + toY(p.y).toFixed(2));
     }
     if (current.length > 1) paths.push(current.join(' '));
@@ -91,9 +149,19 @@
     return {
       paths: paths,
       range: range,
+      natural: natural,
+      escapes: natural.min < range.min - (range.max - range.min) * 0.02
+        || natural.max > range.max + (range.max - range.min) * 0.02,
       xRange: { min: xMin, max: xMax },
       axisY: range.min <= 0 && range.max >= 0 ? toY(0) : null,
-      axisX: xMin <= 0 && xMax >= 0 ? toX(0) : null
+      axisX: xMin <= 0 && xMax >= 0 ? toX(0) : null,
+      plot: { left: pad.left, top: pad.top, width: inner.w, height: inner.h },
+      yTicks: ticks(range.min, range.max, 4).map(function (v) {
+        return { value: v, y: toY(v) };
+      }),
+      xTicks: ticks(xMin, xMax, 4).map(function (v) {
+        return { value: v, x: toX(v) };
+      })
     };
   }
 
@@ -104,7 +172,16 @@
     return String(Math.round(value * 1000) / 1000);
   }
 
-  var api = { sample: sample, verticalRange: verticalRange, geometry: geometry, format: format, SAMPLES: SAMPLES };
+  var api = {
+    sample: sample,
+    verticalRange: verticalRange,
+    unionRange: unionRange,
+    niceStep: niceStep,
+    ticks: ticks,
+    geometry: geometry,
+    format: format,
+    SAMPLES: SAMPLES
+  };
   root.PlotDeckPlot = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

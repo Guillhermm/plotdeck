@@ -45,6 +45,24 @@ page with a hundred equations costs the same as a page with one.
 - Slider positions belong to the slide, so they survive leaving and coming back.
 - "Show on page" scrolls the page to the equation and outlines it.
 
+## Controls on a slide
+
+Every slide has the axis window: `x from … to …`. A slide only gets sliders when the
+equation actually has parameters, so `f(x)=1/(1+e^{-x})` has none and
+`f(x)=L/(1+e^{-k(x-x_0)})` has three. On the Wikipedia article for the logistic
+function, 11 of the 23 slides carry no parameters at all.
+
+**The vertical frame is measured once per slide and then held.** This matters more
+than it sounds. If the axis is refitted on every redraw, a scale parameter stretches
+the data and the axis by exactly the same factor, so the curve is redrawn pixel for
+pixel identical and the slider appears dead. On that same page, 12 of the 16 sliders
+were affected: every one changed the numbers, only 4 changed the picture. With the
+frame held, all 16 change the picture.
+
+When a curve grows past the held frame it is clipped at the edge, the slide says
+"curve leaves the frame", and **Refit** rescales to the current curve. Tick labels on
+both axes make the size of the change readable rather than implied.
+
 ## Measured yield
 
 Live pages, Chrome 154. "Found" counts distinct expressions after deduplication.

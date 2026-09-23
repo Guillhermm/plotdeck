@@ -9,7 +9,8 @@
   if (window.__plotdeck) return;
 
   var SVG_NS = 'http://www.w3.org/2000/svg';
-  var BOX = { width: 344, height: 172, pad: 10 };
+  // Asymmetric padding: the left gutter and the strip below hold tick labels.
+  var BOX = { width: 344, height: 176, padLeft: 40, padRight: 8, padTop: 10, padBottom: 20 };
   var MAX_SLIDES = 120;
 
   var extract = window.PlotDeckExtract;
@@ -62,6 +63,15 @@
     '.slider output { font: 11px ui-monospace, Menlo, monospace; color: #e6edf3; text-align: right; }',
     'input[type=range] { width: 100%; accent-color: #4f9dfd; }',
     '.meta { color: #7d8b9a; font-size: 11px; margin-top: 8px; }',
+    '.figure-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }',
+    '.figure-head .spacer { flex: 1; }',
+    '.warn { color: #e3b341; font-size: 11px; }',
+    '.domain { display: flex; align-items: center; gap: 6px; margin-top: 10px;',
+    '  color: #7d8b9a; font-size: 11px; }',
+    '.domain input { width: 62px; background: #0d1117; color: #e6edf3;',
+    '  border: 1px solid #2c3a4a; border-radius: 4px; padding: 3px 5px;',
+    '  font: 11px ui-monospace, Menlo, monospace; }',
+    'button.mini { padding: 3px 8px; font-size: 11px; }',
     '.nav { display: flex; align-items: center; gap: 8px; padding: 10px 14px;',
     '  border-top: 1px solid #222c38; flex: none; }',
     '.nav .spacer { flex: 1; }',
@@ -103,7 +113,13 @@
 
   function drawPlot(slide) {
     var points = plotter.sample(slide.plan, slide.values);
-    var geo = plotter.geometry(points, BOX);
+    // The frame is measured once per slide and then held, so moving a scale
+    // parameter moves the curve instead of silently rescaling the axis.
+    if (!slide.frame) {
+      var first = plotter.geometry(points, BOX);
+      slide.frame = first ? first.range : null;
+    }
+    var geo = plotter.geometry(points, BOX, slide.frame);
     var svg = svgEl('svg', {
       width: BOX.width, height: BOX.height,
       viewBox: '0 0 ' + BOX.width + ' ' + BOX.height
@@ -120,18 +136,63 @@
       return { svg: svg, geo: null };
     }
 
+    var plotArea = geo.plot;
+    var clipId = 'clip-' + Math.random().toString(36).slice(2, 9);
+    var defs = svgEl('defs', {});
+    var clip = svgEl('clipPath', { id: clipId });
+    clip.appendChild(svgEl('rect', {
+      x: plotArea.left, y: plotArea.top, width: plotArea.width, height: plotArea.height
+    }));
+    defs.appendChild(clip);
+    svg.appendChild(defs);
+
+    geo.yTicks.forEach(function (tick) {
+      svg.appendChild(svgEl('line', {
+        x1: plotArea.left, y1: tick.y, x2: plotArea.left + plotArea.width, y2: tick.y,
+        stroke: '#1b2430', 'stroke-width': 1
+      }));
+      var text = svgEl('text', {
+        x: plotArea.left - 5, y: tick.y + 3.5, fill: '#7d8b9a',
+        'font-size': 9, 'text-anchor': 'end', 'font-family': 'ui-monospace, Menlo, monospace'
+      });
+      text.textContent = plotter.format(tick.value);
+      svg.appendChild(text);
+    });
+
+    geo.xTicks.forEach(function (tick) {
+      svg.appendChild(svgEl('line', {
+        x1: tick.x, y1: plotArea.top, x2: tick.x, y2: plotArea.top + plotArea.height,
+        stroke: '#1b2430', 'stroke-width': 1
+      }));
+      var text = svgEl('text', {
+        x: tick.x, y: BOX.height - 6, fill: '#7d8b9a',
+        'font-size': 9, 'text-anchor': 'middle', 'font-family': 'ui-monospace, Menlo, monospace'
+      });
+      text.textContent = plotter.format(tick.value);
+      svg.appendChild(text);
+    });
+
     if (geo.axisY !== null) {
-      svg.appendChild(svgEl('line', { x1: 0, y1: geo.axisY, x2: BOX.width, y2: geo.axisY, stroke: '#2c3a4a', 'stroke-width': 1 }));
+      svg.appendChild(svgEl('line', {
+        x1: plotArea.left, y1: geo.axisY, x2: plotArea.left + plotArea.width, y2: geo.axisY,
+        stroke: '#33445a', 'stroke-width': 1
+      }));
     }
     if (geo.axisX !== null) {
-      svg.appendChild(svgEl('line', { x1: geo.axisX, y1: 0, x2: geo.axisX, y2: BOX.height, stroke: '#2c3a4a', 'stroke-width': 1 }));
+      svg.appendChild(svgEl('line', {
+        x1: geo.axisX, y1: plotArea.top, x2: geo.axisX, y2: plotArea.top + plotArea.height,
+        stroke: '#33445a', 'stroke-width': 1
+      }));
     }
+
+    var curves = svgEl('g', { 'clip-path': 'url(#' + clipId + ')' });
     geo.paths.forEach(function (d) {
-      svg.appendChild(svgEl('path', {
+      curves.appendChild(svgEl('path', {
         d: d, fill: 'none', stroke: '#4f9dfd',
         'stroke-width': 1.8, 'stroke-linejoin': 'round'
       }));
     });
+    svg.appendChild(curves);
     return { svg: svg, geo: geo };
   }
 
@@ -146,6 +207,15 @@
     card.appendChild(rendered);
     card.appendChild(el('div', 'tex', slide.tex));
 
+    var figureHead = el('div', 'figure-head');
+    var warn = el('span', 'warn', '');
+    var refit = el('button', 'mini', 'Refit');
+    refit.title = 'Rescale the vertical axis to the current curve';
+    figureHead.appendChild(warn);
+    figureHead.appendChild(el('span', 'spacer'));
+    figureHead.appendChild(refit);
+    card.appendChild(figureHead);
+
     var figure = el('div');
     card.appendChild(figure);
     var meta = el('div', 'meta');
@@ -154,13 +224,18 @@
     function redraw() {
       var drawn = drawPlot(slide);
       figure.replaceChildren(drawn.svg);
-      var domain = plotter.format(slide.plan.domain.min) + ' to ' + plotter.format(slide.plan.domain.max);
+      warn.textContent = drawn.geo && drawn.geo.escapes ? 'curve leaves the frame' : '';
       var range = drawn.geo
         ? plotter.format(drawn.geo.range.min) + ' to ' + plotter.format(drawn.geo.range.max)
         : 'none';
-      meta.textContent = slide.plan.axis + ': ' + domain + '   ' + slide.plan.label + ': ' + range
+      meta.textContent = slide.plan.label + ' frame: ' + range
         + (slide.plan.axisChoice === 'fallback' ? '   (axis guessed)' : '');
     }
+
+    refit.addEventListener('click', function () {
+      slide.frame = null;
+      redraw();
+    });
 
     if (slide.plan.sliders.length) {
       var sliders = el('div', 'sliders');
@@ -186,6 +261,25 @@
       });
       card.appendChild(sliders);
     }
+
+    // Every slide gets at least these: the window on the axis.
+    var domain = el('div', 'domain');
+    domain.appendChild(el('span', null, slide.plan.axis + ' from'));
+    ['min', 'max'].forEach(function (key, position) {
+      if (position === 1) domain.appendChild(el('span', null, 'to'));
+      var input = document.createElement('input');
+      input.type = 'number';
+      input.step = 'any';
+      input.value = String(Math.round(slide.plan.domain[key] * 1000) / 1000);
+      input.addEventListener('change', function () {
+        var value = Number(input.value);
+        if (!Number.isFinite(value)) return;
+        slide.plan.domain[key] = value;
+        redraw();
+      });
+      domain.appendChild(input);
+    });
+    card.appendChild(domain);
 
     redraw();
     return card;
