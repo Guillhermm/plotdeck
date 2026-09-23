@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Plot deck",
+  "version": "0.1.0",
+  "description": "Finds every equation on a page and draws it, with a slider for each parameter. No model, no network.",
+  "permissions": ["activeTab", "scripting"],
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "Plot the equations on this page"
+  },
+  "icons": {
+    "16": "src/images/icon-16.png",
+    "48": "src/images/icon-48.png",
+    "128": "src/images/icon-128.png"
+  }
+}
