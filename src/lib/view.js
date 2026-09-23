@@ -40,6 +40,27 @@
     return { min: middle - half, max: middle + half };
   }
 
+  /** The smallest window about zero that still holds the whole range. */
+  function centerZero(range) {
+    var reach = Math.max(Math.abs(range.min), Math.abs(range.max));
+    if (!(reach > 0)) reach = 0.5;
+    return { min: -reach, max: reach };
+  }
+
+  /**
+   * Puts zero in the middle when zero is genuinely inside the measured range.
+   *
+   * The test is strict on purpose. A window of 0 to 10 over time, or 0.01 to 10
+   * under a logarithm, only touches zero at its edge, and centring those on
+   * zero would spend half the picture where the function does not exist.
+   */
+  function frameFor(range, zeroCentered) {
+    if (!range) return null;
+    if (!zeroCentered) return range;
+    if (!(range.min < 0 && range.max > 0)) return range;
+    return centerZero(range);
+  }
+
   function clampPosition(position) {
     if (position < -STEPS) return -STEPS;
     if (position > STEPS) return STEPS;
@@ -51,6 +72,8 @@
     center: center,
     span: span,
     zoom: zoom,
+    centerZero: centerZero,
+    frameFor: frameFor,
     factorFor: factorFor,
     positionFor: positionFor,
     clampPosition: clampPosition

@@ -68,6 +68,9 @@
     '.figure-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }',
     '.figure-head .spacer { flex: 1; }',
     '.warn { color: #e3b341; font-size: 11px; }',
+    '.toggle { display: flex; align-items: center; gap: 4px; color: #7d8b9a;',
+    '  font-size: 11px; cursor: pointer; user-select: none; }',
+    '.toggle input { accent-color: #4f9dfd; margin: 0; }',
     'button.mini { padding: 3px 8px; font-size: 11px; }',
     '.nav { display: flex; align-items: center; gap: 8px; padding: 10px 14px;',
     '  border-top: 1px solid #222c38; flex: none; }',
@@ -109,7 +112,10 @@
   }
 
   function drawPlot(slide) {
-    var domain = viewer.zoom(slide.baseDomain, viewer.factorFor(slide.view.x));
+    var domain = viewer.zoom(
+      viewer.frameFor(slide.baseDomain, slide.zeroCentered),
+      viewer.factorFor(slide.view.x)
+    );
     var points = plotter.sample(
       { axis: slide.plan.axis, ast: slide.plan.ast, domain: domain },
       slide.values
@@ -121,7 +127,10 @@
       slide.baseFrame = first ? first.range : null;
     }
     var frame = slide.baseFrame
-      ? viewer.zoom(slide.baseFrame, viewer.factorFor(slide.view.y))
+      ? viewer.zoom(
+        viewer.frameFor(slide.baseFrame, slide.zeroCentered),
+        viewer.factorFor(slide.view.y)
+      )
       : null;
     var geo = plotter.geometry(points, BOX, frame);
     var svg = svgEl('svg', {
@@ -213,12 +222,25 @@
 
     var figureHead = el('div', 'figure-head');
     var warn = el('span', 'warn', '');
+    var zeroLabel = el('label', 'toggle');
+    var zeroBox = document.createElement('input');
+    zeroBox.type = 'checkbox';
+    zeroBox.checked = slide.zeroCentered;
+    zeroLabel.title = 'Keep zero in the middle of both axes';
+    zeroLabel.appendChild(zeroBox);
+    zeroLabel.appendChild(el('span', null, '0 centred'));
     var refit = el('button', 'mini', 'Refit');
-    refit.title = 'Rescale the vertical axis to the current curve';
+    refit.title = 'Measure the vertical frame again from the current curve';
     figureHead.appendChild(warn);
     figureHead.appendChild(el('span', 'spacer'));
+    figureHead.appendChild(zeroLabel);
     figureHead.appendChild(refit);
     card.appendChild(figureHead);
+
+    zeroBox.addEventListener('change', function () {
+      slide.zeroCentered = zeroBox.checked;
+      redraw();
+    });
 
     var figure = el('div');
     card.appendChild(figure);
@@ -448,6 +470,7 @@
         values: values,
         baseDomain: { min: result.plan.domain.min, max: result.plan.domain.max },
         baseFrame: null,
+        zeroCentered: true,
         view: { x: 0, y: 0 }
       });
     });

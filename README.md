@@ -60,6 +60,14 @@ measured span, which is four orders of magnitude on a control that typing two nu
 cannot cover comfortably. The readout is the factor, and the line under the plot gives
 the resulting bounds on both axes.
 
+**0 centred**, on by default, puts zero in the middle of both axes rather than the
+middle of the data. So the logistic function, whose curve runs 0 to 1, gets a vertical
+window of -1.08 to 1.08 with the zero line across the centre, and zooming keeps it
+there. The test is strict: a window only gets recentred when zero lies *inside* it. A
+domain of 0 to 10 over time, or 0.01 to 10 under a logarithm, touches zero only at its
+edge, so it is left alone rather than spending half the picture where the function does
+not exist. Turning the toggle off fits each axis to the data instead.
+
 **The vertical frame is measured once per slide and then held.** This matters more
 than it sounds. If the axis is refitted on every redraw, a scale parameter stretches
 the data and the axis by exactly the same factor, so the curve is redrawn pixel for

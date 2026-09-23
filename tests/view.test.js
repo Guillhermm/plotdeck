@@ -57,6 +57,42 @@ test('a degenerate range still produces a usable window', () => {
   assert.ok(atZero.max > atZero.min);
 });
 
+test('zero centring puts zero in the middle and keeps the whole range', () => {
+  const framed = view.frameFor({ min: -0.08, max: 1.08 }, true);
+  assert.equal(view.center(framed), 0);
+  assert.ok(framed.min <= -0.08 && framed.max >= 1.08);
+  assert.deepEqual(framed, { min: -1.08, max: 1.08 });
+});
+
+test('zero centring leaves a window that only touches zero alone', () => {
+  // time from 0, and the domain of a logarithm: centring these would waste half
+  assert.deepEqual(view.frameFor({ min: 0, max: 10 }, true), { min: 0, max: 10 });
+  assert.deepEqual(view.frameFor({ min: 0.01, max: 10 }, true), { min: 0.01, max: 10 });
+  assert.deepEqual(view.frameFor({ min: -10, max: 0 }, true), { min: -10, max: 0 });
+});
+
+test('an already symmetric window is unchanged', () => {
+  assert.deepEqual(view.frameFor({ min: -10, max: 10 }, true), { min: -10, max: 10 });
+});
+
+test('zero centring can be turned off', () => {
+  const raw = { min: -0.08, max: 1.08 };
+  assert.deepEqual(view.frameFor(raw, false), raw);
+});
+
+test('zero centring survives a range that is entirely tiny', () => {
+  const framed = view.frameFor({ min: -1e-12, max: 1e-12 }, true);
+  assert.equal(view.center(framed), 0);
+  assert.ok(framed.max > framed.min);
+});
+
+test('zooming a zero centred window keeps zero in the middle', () => {
+  const framed = view.frameFor({ min: -0.08, max: 1.08 }, true);
+  for (const position of [-8, 0, 5, 20]) {
+    assert.equal(view.center(view.zoom(framed, view.factorFor(position))), 0);
+  }
+});
+
 test('positions are clamped to the ends of the slider', () => {
   assert.equal(view.clampPosition(-99), -view.STEPS);
   assert.equal(view.clampPosition(99), view.STEPS);
