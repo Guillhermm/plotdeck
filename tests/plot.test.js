@@ -124,6 +124,22 @@ test('the plot area leaves room for the labels', () => {
   assert.ok(geo.yTicks.every((t) => t.y >= 10 && t.y <= 156));
 });
 
+test('combinedRange holds every series', () => {
+  const small = plot.sample(planFor('y=\\sin(x)'), {});
+  const big = plot.sample(planFor('y=3x'), {});
+  const both = plot.combinedRange([small, big]);
+  const alone = plot.verticalRange(small);
+  assert.ok(both.max > alone.max);
+  assert.ok(both.min < alone.min);
+});
+
+test('combinedRange copes with a series that has nothing finite', () => {
+  const empty = [{ x: 0, y: NaN }, { x: 1, y: NaN }];
+  const real = plot.sample(planFor('y=x'), {});
+  assert.deepEqual(plot.combinedRange([empty, real]), plot.verticalRange(real));
+  assert.equal(plot.combinedRange([empty]), null);
+});
+
 test('format keeps numbers short', () => {
   assert.equal(plot.format(3.14159), '3.142');
   assert.equal(plot.format(120000), '1.2e+5');

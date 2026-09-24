@@ -28,6 +28,7 @@
     found: 0,
     index: 0,
     highlighted: null,
+    lastSwipe: 0,
     nodes: {}
   };
 
@@ -52,12 +53,19 @@
     '.card.enter-left { animation: fromLeft .18s ease-out; }',
     '@keyframes fromRight { from { transform: translateX(26px); opacity: 0 } }',
     '@keyframes fromLeft { from { transform: translateX(-26px); opacity: 0 } }',
-    '.label { font-weight: 600; margin-bottom: 2px; }',
     '.kind { color: #7d8b9a; font-size: 11px; margin-bottom: 8px; }',
-    '.rendered { background: #fff; color: #111; border-radius: 5px; padding: 8px 10px;',
-    '  margin-bottom: 8px; overflow-x: auto; font-size: 16px; }',
-    '.tex { font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: #7d8b9a;',
-    '  word-break: break-all; margin-bottom: 10px; }',
+    '.rendered { position: relative; background: #fff; color: #111; border-radius: 5px;',
+    '  padding: 8px 10px; margin-bottom: 10px; overflow-x: auto; font-size: 16px;',
+    '  cursor: pointer; }',
+    '.rendered:hover { box-shadow: 0 0 0 1px #4f9dfd; }',
+    '.copied { position: absolute; top: 4px; right: 6px; background: #11151c;',
+    '  color: #7ee787; font: 10px system-ui, sans-serif; padding: 2px 6px;',
+    '  border-radius: 3px; opacity: 0; transition: opacity .15s; pointer-events: none; }',
+    '.copied.on { opacity: 1; }',
+    '.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 10px;',
+    '  font: 11px ui-monospace, Menlo, monospace; color: #9fb0c0; }',
+    '.legend .entry { display: flex; align-items: center; gap: 5px; }',
+    '.legend i { width: 9px; height: 2px; border-radius: 1px; display: block; }',
     'svg { display: block; background: #0d1117; border-radius: 5px; }',
     '.sliders { margin-top: 10px; display: grid; gap: 7px; }',
     '.slider { display: grid; grid-template-columns: 62px 1fr 44px; align-items: center; gap: 8px; }',
@@ -86,6 +94,34 @@
     '.empty { color: #8b99a8; padding: 28px 14px; text-align: center; }'
   ].join('\n');
 
+  /** Clipboard needs a user gesture, which a click on the formula is. */
+  function copyText(text, feedback) {
+    var done = function () {
+      feedback.classList.add('on');
+      setTimeout(function () { feedback.classList.remove('on'); }, 900);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text, done); });
+      return;
+    }
+    fallbackCopy(text, done);
+  }
+
+  function fallbackCopy(text, done) {
+    var area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    try {
+      document.execCommand('copy');
+      done();
+    } catch (err) { /* nothing more to try */ }
+    area.remove();
+  }
+
   function el(tag, className, text) {
     var node = document.createElement(tag);
     if (className) node.className = className;
@@ -112,20 +148,25 @@
     return copy;
   }
 
+  var SERIES_COLORS = ['#4f9dfd', '#e3b341', '#7ee787', '#ff7b72', '#d2a8ff', '#79c0ff'];
+
   function drawPlot(slide) {
     var domain = viewer.zoom(
       viewer.frameFor(slide.baseDomain, slide.zeroCentered),
       viewer.factorFor(slide.view.x)
     );
-    var points = plotter.sample(
-      { axis: slide.plan.axis, ast: slide.plan.ast, domain: domain },
-      slide.values
-    );
+    var series = slide.plan.series;
+    var pointsList = series.map(function (item) {
+      return plotter.sample(
+        { axis: slide.plan.axis, ast: item.ast, domain: domain },
+        slide.values
+      );
+    });
+
     // The frame is measured once per slide and then held, so moving a scale
     // parameter moves the curve instead of silently rescaling the axis.
     if (!slide.baseFrame) {
-      var first = plotter.geometry(points, BOX);
-      slide.baseFrame = first ? first.range : null;
+      slide.baseFrame = plotter.combinedRange(pointsList);
     }
     var frame = slide.baseFrame
       ? viewer.zoom(
@@ -133,13 +174,19 @@
         viewer.factorFor(slide.view.y)
       )
       : null;
-    var geo = plotter.geometry(points, BOX, frame);
+
+    var geos = pointsList.map(function (points) {
+      return plotter.geometry(points, BOX, frame);
+    });
+    var reference = null;
+    for (var i = 0; i < geos.length && !reference; i += 1) reference = geos[i];
+
     var svg = svgEl('svg', {
       width: BOX.width, height: BOX.height,
       viewBox: '0 0 ' + BOX.width + ' ' + BOX.height
     });
 
-    if (!geo) {
+    if (!reference) {
       svg.appendChild(svgEl('rect', { x: 0, y: 0, width: BOX.width, height: BOX.height, fill: '#0d1117' }));
       var note = svgEl('text', {
         x: BOX.width / 2, y: BOX.height / 2, fill: '#7d8b9a',
@@ -147,10 +194,10 @@
       });
       note.textContent = 'no finite values in this range';
       svg.appendChild(note);
-      return { svg: svg, geo: null };
+      return { svg: svg, geo: null, escapes: false };
     }
 
-    var plotArea = geo.plot;
+    var plotArea = reference.plot;
     var clipId = 'clip-' + Math.random().toString(36).slice(2, 9);
     var defs = svgEl('defs', {});
     var clip = svgEl('clipPath', { id: clipId });
@@ -160,7 +207,7 @@
     defs.appendChild(clip);
     svg.appendChild(defs);
 
-    geo.yTicks.forEach(function (tick) {
+    reference.yTicks.forEach(function (tick) {
       svg.appendChild(svgEl('line', {
         x1: plotArea.left, y1: tick.y, x2: plotArea.left + plotArea.width, y2: tick.y,
         stroke: '#1b2430', 'stroke-width': 1
@@ -173,7 +220,7 @@
       svg.appendChild(text);
     });
 
-    geo.xTicks.forEach(function (tick) {
+    reference.xTicks.forEach(function (tick) {
       svg.appendChild(svgEl('line', {
         x1: tick.x, y1: plotArea.top, x2: tick.x, y2: plotArea.top + plotArea.height,
         stroke: '#1b2430', 'stroke-width': 1
@@ -186,40 +233,69 @@
       svg.appendChild(text);
     });
 
-    if (geo.axisY !== null) {
+    if (reference.axisY !== null) {
       svg.appendChild(svgEl('line', {
-        x1: plotArea.left, y1: geo.axisY, x2: plotArea.left + plotArea.width, y2: geo.axisY,
-        stroke: '#33445a', 'stroke-width': 1
+        x1: plotArea.left, y1: reference.axisY, x2: plotArea.left + plotArea.width,
+        y2: reference.axisY, stroke: '#33445a', 'stroke-width': 1
       }));
     }
-    if (geo.axisX !== null) {
+    if (reference.axisX !== null) {
       svg.appendChild(svgEl('line', {
-        x1: geo.axisX, y1: plotArea.top, x2: geo.axisX, y2: plotArea.top + plotArea.height,
-        stroke: '#33445a', 'stroke-width': 1
+        x1: reference.axisX, y1: plotArea.top, x2: reference.axisX,
+        y2: plotArea.top + plotArea.height, stroke: '#33445a', 'stroke-width': 1
       }));
     }
 
     var curves = svgEl('g', { 'clip-path': 'url(#' + clipId + ')' });
-    geo.paths.forEach(function (d) {
-      curves.appendChild(svgEl('path', {
-        d: d, fill: 'none', stroke: '#4f9dfd',
-        'stroke-width': 1.8, 'stroke-linejoin': 'round'
-      }));
+    var escapes = false;
+    geos.forEach(function (geo, index) {
+      if (!geo) return;
+      if (geo.escapes) escapes = true;
+      var color = SERIES_COLORS[index % SERIES_COLORS.length];
+      geo.paths.forEach(function (d) {
+        curves.appendChild(svgEl('path', {
+          d: d, fill: 'none', stroke: color,
+          'stroke-width': 1.8, 'stroke-linejoin': 'round'
+        }));
+      });
     });
     svg.appendChild(curves);
-    return { svg: svg, geo: geo };
+    return { svg: svg, geo: reference, escapes: escapes };
+  }
+
+  function buildLegend(series) {
+    var legend = el('div', 'legend');
+    series.forEach(function (item, index) {
+      var entry = el('span', 'entry');
+      var dot = el('i');
+      dot.style.background = SERIES_COLORS[index % SERIES_COLORS.length];
+      entry.appendChild(dot);
+      entry.appendChild(el('span', null, item.label));
+      legend.appendChild(entry);
+    });
+    return legend;
   }
 
   function buildCard(slide) {
     var card = el('div', 'card');
-    card.appendChild(el('div', 'label', slide.plan.label + '  vs  ' + slide.plan.axis));
-    card.appendChild(el('div', 'kind',
-      slide.plan.kind === 'expression' ? 'expression, plotted as y' : 'equation'));
+    var kindLabel = slide.plan.kind === 'expression' ? 'expression, plotted as y'
+      : slide.plan.kind === 'system' ? slide.plan.series.length + ' equations, shared axis'
+        : 'equation';
+    card.appendChild(el('div', 'kind', kindLabel));
 
     var rendered = el('div', 'rendered');
+    rendered.title = 'Click to copy the LaTeX';
     rendered.appendChild(cloneSource(slide.element));
+    var copied = el('span', 'copied', 'copied');
+    rendered.appendChild(copied);
+    rendered.addEventListener('click', function () {
+      // A swipe that begins on the formula should not also copy it.
+      if (Date.now() - state.lastSwipe < 400) return;
+      copyText(slide.tex, copied);
+    });
     card.appendChild(rendered);
-    card.appendChild(el('div', 'tex', slide.tex));
+
+    if (slide.plan.series.length > 1) card.appendChild(buildLegend(slide.plan.series));
 
     var figureHead = el('div', 'figure-head');
     var warn = el('span', 'warn', '');
@@ -251,7 +327,7 @@
     function redraw() {
       var drawn = drawPlot(slide);
       figure.replaceChildren(drawn.svg);
-      warn.textContent = drawn.geo && drawn.geo.escapes ? 'curve leaves the frame' : '';
+      warn.textContent = drawn.escapes ? 'curve leaves the frame' : '';
       if (!drawn.geo) {
         meta.textContent = 'nothing finite in this window';
         return;
@@ -366,7 +442,10 @@
       if (!start) return;
       var step = deck.swipeVerdict(event.clientX - start.x, event.clientY - start.y);
       start = null;
-      if (step) move(step);
+      if (step) {
+        state.lastSwipe = Date.now();
+        move(step);
+      }
     });
     stage.addEventListener('pointercancel', function () { start = null; });
   }
@@ -454,31 +533,54 @@
     state.slides = [];
     state.rejects = {};
 
+    function addSlide(tex, item, plan) {
+      if (state.slides.length >= MAX_SLIDES) return;
+      var values = {};
+      plan.sliders.forEach(function (slider) { values[slider.name] = slider.value; });
+      state.slides.push({
+        tex: tex,
+        element: item.element,
+        source: item.source,
+        plan: plan,
+        values: values,
+        baseDomain: { min: plan.domain.min, max: plan.domain.max },
+        baseFrame: null,
+        zeroCentered: true,
+        view: { x: 0, y: 0 }
+      });
+    }
+
     items.forEach(function (item) {
       // A stacked environment holds one equation per line, so it is several
       // expressions wearing one set of delimiters.
-      latex.splitBlocks(item.tex).forEach(function (piece) {
-        if (state.slides.length >= MAX_SLIDES) return;
-        state.found += 1;
+      var pieces = latex.splitBlocks(item.tex);
+      state.found += pieces.length;
+
+      var planned = [];
+      pieces.forEach(function (piece) {
         var result = planner.plan(piece);
         if (!result.ok) {
           state.rejects[result.reason] = (state.rejects[result.reason] || 0) + 1;
           return;
         }
-        var values = {};
-        result.plan.sliders.forEach(function (slider) { values[slider.name] = slider.value; });
-        state.slides.push({
-          tex: piece,
-          element: item.element,
-          source: item.source,
-          plan: result.plan,
-          values: values,
-          baseDomain: { min: result.plan.domain.min, max: result.plan.domain.max },
-          baseFrame: null,
-          zeroCentered: true,
-          view: { x: 0, y: 0 }
-        });
+        planned.push({ tex: piece, plan: result.plan });
       });
+      if (!planned.length) return;
+
+      // Lines that share a parameter belong on one pair of axes. The formula
+      // shown is then the whole block, which is what those lines are.
+      var group = planned.length > 1
+        ? planner.groupPlans(planned.map(function (entry) { return entry.plan; }))
+        : { ok: false };
+
+      if (group.ok) {
+        addSlide(item.tex, item, group.plan);
+        planned.forEach(function (entry, index) {
+          if (group.members.indexOf(index) === -1) addSlide(entry.tex, item, entry.plan);
+        });
+        return;
+      }
+      planned.forEach(function (entry) { addSlide(entry.tex, item, entry.plan); });
     });
   }
 

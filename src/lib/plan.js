@@ -100,6 +100,8 @@
       return { ok: false, reason: err.reason || 'parse-failed', detail: err.message };
     }
 
+    if (evaluate.usesImaginaryUnit(ast)) return { ok: false, reason: 'complex-valued' };
+
     var symbols = evaluate.freeSymbols(ast);
 
     if (!symbols.length) return { ok: false, reason: 'constant' };
@@ -131,10 +133,12 @@
     }
 
     var functions = evaluate.functionsOnAxis(ast, axis);
+    var name = left.form === 'function' ? left.name + '(' + axis + ')' : left.name;
     return {
       ok: true,
       plan: {
-        label: left.form === 'function' ? left.name + '(' + axis + ')' : left.name,
+        label: name,
+        series: [{ label: name, ast: ast }],
         kind: 'equation',
         axis: axis,
         axisChoice: axisChoice,
@@ -161,6 +165,7 @@
       return { ok: false, reason: err.reason || 'parse-failed', detail: err.message };
     }
     if (nodeCount(ast) < 3) return { ok: false, reason: 'trivial-expression' };
+    if (evaluate.usesImaginaryUnit(ast)) return { ok: false, reason: 'complex-valued' };
 
     var symbols = evaluate.freeSymbols(ast);
     if (!symbols.length) return { ok: false, reason: 'constant' };
@@ -180,6 +185,7 @@
       ok: true,
       plan: {
         label: 'y',
+        series: [{ label: 'y', ast: ast }],
         kind: 'expression',
         axis: axis,
         axisChoice: 'convention',
@@ -191,9 +197,85 @@
     };
   }
 
+  /**
+   * Draws several plans on one pair of axes.
+   *
+   * The lines of a stacked environment usually share a parameter: a
+   * parametrisation gives x_0, x_1, x_2 as functions of the same angle. Read
+   * one at a time they are unrelated curves; read together they are the object.
+   *
+   * @param {Array<object>} plans plans that already succeeded on their own
+   * @returns {{ok: true, plan: object, members: number[]} | {ok: false, reason: string}}
+   */
+  function groupPlans(plans) {
+    if (!plans || plans.length < 2) return { ok: false, reason: 'not-a-system' };
+
+    var symbolsOf = plans.map(function (item) { return evaluate.freeSymbols(item.ast); });
+
+    // The shared axis is the one the most lines depend on. Ties go to whichever
+    // is the more conventional independent variable.
+    var counts = {};
+    symbolsOf.forEach(function (names) {
+      names.forEach(function (name) { counts[name] = (counts[name] || 0) + 1; });
+    });
+    var axis = Object.keys(counts).sort(function (a, b) {
+      if (counts[b] !== counts[a]) return counts[b] - counts[a];
+      var rankA = AXIS_PREFERENCE.indexOf(a);
+      var rankB = AXIS_PREFERENCE.indexOf(b);
+      if (rankA === -1) rankA = AXIS_PREFERENCE.length;
+      if (rankB === -1) rankB = AXIS_PREFERENCE.length;
+      if (rankA !== rankB) return rankA - rankB;
+      return a < b ? -1 : 1;
+    })[0];
+
+    var members = [];
+    symbolsOf.forEach(function (names, index) {
+      if (names.indexOf(axis) !== -1) members.push(index);
+    });
+    if (members.length < 2) return { ok: false, reason: 'no-shared-axis' };
+
+    var parameters = [];
+    members.forEach(function (index) {
+      symbolsOf[index].forEach(function (name) {
+        if (name !== axis && parameters.indexOf(name) === -1) parameters.push(name);
+      });
+    });
+    if (parameters.length > MAX_SLIDERS) {
+      return { ok: false, reason: 'too-many-parameters', detail: parameters.join(', ') };
+    }
+
+    var series = members.map(function (index) {
+      return { label: plans[index].label, ast: plans[index].ast };
+    });
+    var functions = [];
+    var allSymbols = [axis].concat(parameters);
+    members.forEach(function (index) {
+      evaluate.functionsOnAxis(plans[index].ast, axis).forEach(function (name) {
+        if (functions.indexOf(name) === -1) functions.push(name);
+      });
+    });
+
+    return {
+      ok: true,
+      members: members,
+      plan: {
+        label: series.map(function (item) { return item.label; }).join(', '),
+        series: series,
+        kind: 'system',
+        axis: axis,
+        axisChoice: 'shared',
+        ast: series[0].ast,
+        sliders: slidersFor(parameters),
+        domain: domainFor(functions, allSymbols),
+        functions: functions
+      }
+    };
+  }
+
   var api = {
     plan: plan,
     planExpression: planExpression,
+    groupPlans: groupPlans,
     readLeftSide: readLeftSide,
     AXIS_PREFERENCE: AXIS_PREFERENCE
   };

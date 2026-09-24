@@ -31,6 +31,13 @@ Four stages, each of which can be checked on its own.
    turn every other free symbol into a slider, and choose the domain from the
    functions actually applied to the axis. A bare expression with no `=` is plotted
    as `y`.
+
+   Lines that came from the same stacked environment and depend on the same symbol
+   are then grouped onto one pair of axes. A parametrisation gives `x_0`, `x_1`,
+   `x_2`, `x_3` as functions of one angle: read one at a time they are unrelated
+   curves, read together they are the object. The shared axis is the symbol the most
+   lines depend on, the sliders are the union of what is left, and the formula shown
+   is the whole block, which is what those lines are.
 4. **Draw.** Sampled at 480 points into an inline SVG. Poles become gaps rather than
    vertical lines, and the vertical range is clipped around the median so one
    asymptote cannot flatten the curve.
@@ -47,6 +54,12 @@ page with a hundred equations costs the same as a page with one.
 - Both ends clamp rather than wrap, and the buttons disable there.
 - Slider positions belong to the slide, so they survive leaving and coming back.
 - "Show on page" scrolls the page to the equation and outlines it.
+
+## A slide
+
+The formula is shown as the page rendered it, copied out of the document, and
+clicking it copies the LaTeX. Under it come the curves, then the controls. A slide
+built from several lines carries a legend naming each curve.
 
 ## Controls on a slide
 
@@ -87,15 +100,17 @@ both axes make the size of the change readable rather than implied.
 
 Live pages, Chrome 154. "Found" counts distinct expressions after deduplication.
 
-| Page | Found | Plotted | Time |
-|---|---|---|---|
-| Wikipedia: Normal distribution | 401 | 51 | 41ms |
-| Wikipedia: Logistic function | 152 | 33 | 33ms |
-| Wikipedia: Sine and cosine | 205 | 23 | 28ms |
-| Wikipedia: Exponential function | 134 | 21 | 17ms |
-| Wikipedia: Quadratic equation | 90 | 17 | 39ms |
-| Wikipedia: 3-sphere | 37 | 16 | 24ms |
-| arXiv HTML: Attention Is All You Need | 105 | 2 | 22ms |
+| Page | Units | Slides | Curves | Time |
+|---|---|---|---|---|
+| Wikipedia: Normal distribution | 401 | 48 | 49 | 40ms |
+| Wikipedia: Logistic function | 152 | 33 | 33 | 26ms |
+| Wikipedia: Exponential function | 134 | 21 | 21 | 26ms |
+| Wikipedia: Quadratic equation | 90 | 17 | 17 | 22ms |
+| Wikipedia: Sine and cosine | 205 | 14 | 16 | 32ms |
+| Wikipedia: 3-sphere | 37 | 5 | 11 | 24ms |
+| arXiv HTML: Attention Is All You Need | 105 | 2 | 2 | 17ms |
+
+A slide can hold more than one curve, which is why the last two columns differ.
 
 The shape of that table is the finding. A maths article yields a usable deck. A
 machine learning paper yields nothing, because its equations are matrix identities,
@@ -117,6 +132,10 @@ skipped: `trivial-expression`, `implicit-relation`, `chained-relation`,
 - Big-O and its relatives, which are written exactly like multiplication.
 - Unknown operator names: `\mathrm{softmax}(x)` is rejected, `\mathrm{log}(x)` is not.
 - Anything with more than four free parameters.
+- Complex and quaternion expressions. The test is how `i` is used rather than whether
+  it appears: as a factor beside another quantity (`x+iy`) or in an exponent of `e`
+  it is the imaginary unit and the expression is refused, while standing alone, as in
+  the interest rate of `P(1+i)^n`, it is an ordinary real variable and still plots.
 
 ## Known limits
 

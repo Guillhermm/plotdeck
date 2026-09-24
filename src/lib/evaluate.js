@@ -71,8 +71,32 @@
     return out;
   }
 
+  /**
+   * Tells the imaginary unit from an ordinary variable called i.
+   *
+   * The two look identical in isolation, so the test is how i is used. As a
+   * factor beside another quantity (x + iy, or the quaternion basis) or in an
+   * exponent of e it is imaginary; standing alone, as in the interest rate of
+   * P(1+i)^n, it is a real variable and the expression can still be drawn.
+   */
+  function usesImaginaryUnit(node) {
+    if (!node || typeof node !== 'object') return false;
+    var isUnit = function (child) {
+      return child && child.type === 'sym' && child.name === 'i';
+    };
+    if (node.type === 'mul' && (isUnit(node.left) || isUnit(node.right))) return true;
+    if (node.type === 'pow' && isUnit(node.left)) return true;
+    if (node.type === 'pow' && node.left && node.left.type === 'sym' && node.left.name === 'e'
+      && freeSymbols(node.right).indexOf('i') !== -1) return true;
+    if (node.type === 'neg' && isUnit(node.arg)) return true;
+    return ['left', 'right', 'arg'].some(function (key) {
+      return usesImaginaryUnit(node[key]);
+    });
+  }
+
   var api = {
     evaluate: evaluate,
+    usesImaginaryUnit: usesImaginaryUnit,
     freeSymbols: freeSymbols,
     functionsUsed: functionsUsed,
     functionsOnAxis: functionsOnAxis

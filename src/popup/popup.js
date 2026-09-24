@@ -83,6 +83,8 @@ async function onToggle() {
       return;
     }
     render(result);
+    // The deck is on the page now, so the popup has nothing left to say.
+    if (result.open) window.close();
   } catch (err) {
     els.status.textContent = /cannot be scripted|Cannot access/i.test(String(err.message))
       ? 'This page cannot be modified by extensions.'

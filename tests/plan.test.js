@@ -86,6 +86,16 @@ test('angles are conventional independent variables', () => {
   assert.equal(plan('y=a\\sin \\eta').plan.axis, 'eta');
 });
 
+test('the imaginary unit is refused, a real variable named i is not', () => {
+  assert.equal(reason('z=x+iy'), 'complex-valued');
+  assert.equal(reason('z_1=e^{i\\xi }\\sin \\eta'), 'complex-valued');
+  assert.equal(reason('\\tau =(\\cos \\theta )i+(\\sin \\theta )j'), 'complex-valued');
+  // an interest rate is a perfectly real i
+  const real = plan('A=P(1+i)^n');
+  assert.equal(real.ok, true);
+  assert.ok(real.plan.sliders.map((s) => s.name).includes('i'));
+});
+
 test('asymptotic notation is not multiplication', () => {
   assert.equal(reason('O(n^2 d)'), 'asymptotic-notation');
   assert.equal(reason('T=O(n\\log n)'), 'asymptotic-notation');
@@ -107,6 +117,49 @@ test('a multi-letter subscript stays part of the symbol name', () => {
 
 test('a declared argument that never appears is rejected', () => {
   assert.equal(reason('f(x)=a+b'), 'argument-unused');
+});
+
+test('every plan carries a series list', () => {
+  const single = plan('y=x^2').plan;
+  assert.equal(single.series.length, 1);
+  assert.equal(single.series[0].label, 'y');
+  assert.equal(plan('2x+1').plan.series.length, 1);
+});
+
+test('lines that share a parameter are grouped onto one pair of axes', () => {
+  const latex = require('../src/lib/latex.js');
+  const block = '\\begin{aligned}x_{0}&=r\\cos \\psi \\\\x_{1}&=r\\sin \\psi \\cos \\theta'
+    + '\\\\x_{2}&=r\\sin \\psi \\sin \\theta \\end{aligned}';
+  const plans = latex.splitBlocks(block).map((p) => plan(p)).filter((r) => r.ok).map((r) => r.plan);
+  const group = require('../src/lib/plan.js').groupPlans(plans);
+  assert.equal(group.ok, true);
+  assert.equal(group.plan.kind, 'system');
+  assert.equal(group.plan.axis, 'psi');
+  assert.equal(group.plan.axisChoice, 'shared');
+  assert.equal(group.plan.series.length, 3);
+  assert.deepEqual(group.plan.sliders.map((s) => s.name), ['r', 'theta']);
+  assert.deepEqual(group.members, [0, 1, 2]);
+});
+
+test('the shared axis is the one the most lines depend on', () => {
+  const { groupPlans } = require('../src/lib/plan.js');
+  const plans = ['y=at', 'z=bt', 'w=a'].map((t) => plan(t).plan);
+  const group = groupPlans(plans);
+  assert.equal(group.plan.axis, 't');
+  assert.deepEqual(group.members, [0, 1], 'the line without the axis is left out');
+});
+
+test('grouping needs at least two lines that share the axis', () => {
+  const { groupPlans } = require('../src/lib/plan.js');
+  assert.equal(groupPlans([plan('y=x').plan]).ok, false);
+  assert.equal(groupPlans(['y=ax', 'z=bt'].map((t) => plan(t).plan)).reason, 'no-shared-axis');
+});
+
+test('a group refuses more parameters than it can show', () => {
+  const { groupPlans } = require('../src/lib/plan.js');
+  // each line is fine on its own; together they need six sliders
+  const plans = ['y=atbc', 'z=tdgh'].map((t) => plan(t).plan);
+  assert.equal(groupPlans(plans).reason, 'too-many-parameters');
 });
 
 test('plans carry an evaluable tree', () => {

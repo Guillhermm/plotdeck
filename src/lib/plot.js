@@ -55,6 +55,15 @@
     return { min: min - margin, max: max + margin };
   }
 
+  /** The range that holds every series, so one frame fits them all. */
+  function combinedRange(pointsList) {
+    var total = null;
+    for (var i = 0; i < pointsList.length; i += 1) {
+      total = unionRange(total, verticalRange(pointsList[i]));
+    }
+    return total;
+  }
+
   /** The smallest range containing both. */
   function unionRange(a, b) {
     if (!a) return b;
@@ -176,6 +185,7 @@
     sample: sample,
     verticalRange: verticalRange,
     unionRange: unionRange,
+    combinedRange: combinedRange,
     niceStep: niceStep,
     ticks: ticks,
     geometry: geometry,
