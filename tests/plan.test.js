@@ -63,7 +63,6 @@ test('a bare expression needs substance and a conventional variable', () => {
 });
 
 test('each rejection has its own reason', () => {
-  assert.equal(reason('a=b=c'), 'chained-relation');
   assert.equal(reason('x^2+y^2=1'), 'implicit-relation');
   assert.equal(reason('N=6'), 'constant');
   assert.equal(reason('\\int_0^1 f=1'), 'unsupported-integral');
@@ -71,6 +70,20 @@ test('each rejection has its own reason', () => {
   assert.equal(reason('y=ax+b+c+d+e_1'), 'too-many-parameters');
   assert.equal(reason('y=a+b+c+d+e_1+f_1'), 'no-axis-variable');
   assert.equal(reason('x=x'), 'self-referential');
+});
+
+test('a chain is read from its outer ends', () => {
+  const result = plan('q=e^{\\tau \\psi }=\\cos \\psi +\\tau \\sin \\psi');
+  assert.equal(result.ok, true);
+  assert.equal(result.plan.label, 'q');
+  assert.equal(result.plan.axis, 'psi');
+  assert.deepEqual(result.plan.sliders.map((s) => s.name), ['tau']);
+});
+
+test('angles are conventional independent variables', () => {
+  assert.equal(plan('x_0=r\\cos \\psi').plan.axis, 'psi');
+  assert.equal(plan('y=a\\sin \\phi').plan.axis, 'phi');
+  assert.equal(plan('y=a\\sin \\eta').plan.axis, 'eta');
 });
 
 test('asymptotic notation is not multiplication', () => {

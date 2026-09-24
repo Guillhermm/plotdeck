@@ -14,6 +14,36 @@ test('normalize strips presentation markup', () => {
   assert.equal(latex.normalize('d_{\\text{model}}'), 'd_{model}');
 });
 
+test('normalize drops the punctuation that ends the sentence', () => {
+  assert.equal(latex.normalize('{\\displaystyle H={\\frac {1}{2}}\\pi ^{2}r^{4}.}'),
+    'H={\\frac {1}{2}}\\pi ^{2}r^{4}');
+  assert.equal(latex.normalize('x+1,'), 'x+1');
+  assert.equal(latex.normalize('y=2.5'), 'y=2.5', 'a decimal point is not punctuation');
+});
+
+test('splitBlocks turns a stacked environment into one line each', () => {
+  const block = '{\\begin{aligned}x_{0}&=r\\cos \\psi \\\\x_{1}&=r\\sin \\psi \\end{aligned}}';
+  const lines = latex.splitBlocks(block);
+  assert.equal(lines.length, 2);
+  assert.equal(lines[0], 'x_{0} =r\\cos \\psi');
+  assert.ok(lines[1].startsWith('x_{1}'));
+});
+
+test('splitBlocks keeps the value and drops the condition in cases', () => {
+  const block = '\\begin{cases}x & x>0 \\\\ -x & x<0\\end{cases}';
+  assert.deepEqual(latex.splitBlocks(block), ['x', '-x']);
+});
+
+test('splitBlocks leaves a matrix alone, since it is one object', () => {
+  const matrix = '\\begin{pmatrix}a\\\\b\\end{pmatrix}';
+  assert.deepEqual(latex.splitBlocks(matrix), [matrix]);
+});
+
+test('splitBlocks always returns a list', () => {
+  assert.deepEqual(latex.splitBlocks('x+1'), ['x+1']);
+  assert.equal(latex.splitBlocks('').length, 1);
+});
+
 test('normalize keeps braces it cannot safely drop', () => {
   assert.equal(latex.normalize('{a}+{b}'), '{a}+{b}');
 });

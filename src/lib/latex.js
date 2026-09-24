@@ -75,9 +75,12 @@
     s = s.replace(/\\div\b/g, '/');
     s = s.replace(/\\%/g, '%');
     s = s.trim();
+    // A formula that ends a sentence carries the full stop inside the math.
+    s = s.replace(/[.,;:]+$/, '').trim();
     // Unwrap a single pair of braces around the whole expression.
     while (/^\{[\s\S]*\}$/.test(s) && balanced(s.slice(1, -1))) {
       s = s.slice(1, -1).trim();
+      s = s.replace(/[.,;:]+$/, '').trim();
     }
     return s;
   }
@@ -90,6 +93,30 @@
       if (depth < 0) return false;
     }
     return depth === 0;
+  }
+
+  // Environments that stack one equation per line. Matrix environments are not
+  // here on purpose: those are a single object, not a list.
+  var SYSTEMS = /\\begin\{(aligned|align\*?|alignat\*?|gathered|gather\*?|split|cases|eqnarray\*?)\}(?:\{[^{}]*\})?([\s\S]*?)\\end\{\1\}/;
+
+  /**
+   * Splits a stacked environment into one expression per line. Everything else
+   * comes back as a single item, so callers can always treat the result as a
+   * list.
+   */
+  function splitBlocks(tex) {
+    var match = String(tex).match(SYSTEMS);
+    if (!match) return [String(tex)];
+    var isCases = /^cases/.test(match[1]);
+    return match[2]
+      .split(/\\\\(?:\s*\[[^\]]*\])?/)
+      .map(function (line) {
+        // In cases the ampersand separates the value from its condition; in the
+        // aligned family it only marks where the equals signs line up.
+        var body = isCases ? line.split('&')[0] : line.replace(/&/g, ' ');
+        return body.trim();
+      })
+      .filter(function (line) { return line.length > 0; });
   }
 
   function ParseError(message, reason) {
@@ -402,6 +429,7 @@
     UNSUPPORTED: UNSUPPORTED,
     ParseError: ParseError,
     normalize: normalize,
+    splitBlocks: splitBlocks,
     tokenize: tokenize,
     parse: parse,
     splitRelation: splitRelation

@@ -19,6 +19,9 @@ Four stages, each of which can be checked on its own.
    TeX `annotation` KaTeX writes, MathJax v2 script tags, and Wikipedia's fallback
    image `alt`. Nothing is recognised or guessed. Wikipedia publishes each formula
    twice, as MathML and as an image, so results are keyed on the expression itself.
+   A stacked environment (`aligned`, `cases`, `gathered` and their relatives) holds
+   one equation per line, so it is split into one unit per line. Matrix environments
+   are left whole, because a matrix is one object rather than a list.
 2. **Parse.** A small recursive descent parser over the subset of LaTeX that can be
    drawn: arithmetic, implicit multiplication, fractions, roots, powers, the usual
    functions, subscripted symbol names. Everything else is rejected *by name*, so a
@@ -86,13 +89,13 @@ Live pages, Chrome 154. "Found" counts distinct expressions after deduplication.
 
 | Page | Found | Plotted | Time |
 |---|---|---|---|
-| Wikipedia: Logistic function | 143 | 23 | 20ms |
-| Wikipedia: Exponential function | 129 | 18 | 13ms |
-| Wikipedia: Sine and cosine | 168 | 13 | 19ms |
-| Wikipedia: Quadratic equation | 90 | 13 | 17ms |
-| Wikipedia: Normal distribution | 358 | 34 | 37ms |
-| arXiv HTML: Attention Is All You Need | 105 | 2 | 10ms |
-| katex.org | 5 | 0 | 3ms |
+| Wikipedia: Normal distribution | 401 | 51 | 41ms |
+| Wikipedia: Logistic function | 152 | 33 | 33ms |
+| Wikipedia: Sine and cosine | 205 | 23 | 28ms |
+| Wikipedia: Exponential function | 134 | 21 | 17ms |
+| Wikipedia: Quadratic equation | 90 | 17 | 39ms |
+| Wikipedia: 3-sphere | 37 | 16 | 24ms |
+| arXiv HTML: Attention Is All You Need | 105 | 2 | 22ms |
 
 The shape of that table is the finding. A maths article yields a usable deck. A
 machine learning paper yields nothing, because its equations are matrix identities,
@@ -105,7 +108,12 @@ skipped: `trivial-expression`, `implicit-relation`, `chained-relation`,
 ## What it deliberately refuses
 
 - Integrals, sums, products, limits, derivatives, matrices and vectors.
-- Implicit relations such as `x^2+y^2=1`, which need a contour, not a curve.
+- Implicit relations such as `x^2+y^2=1`, which need a contour, not a curve. This
+  also catches set-builder definitions, which look like equations but define a
+  membership rather than a value.
+- Anything in three dimensions or more. A surface `z=f(x,y)` and a parametric
+  surface are both refused, and a 3-sphere could not be drawn even with a surface
+  renderer, since it is a hypersurface in four dimensions.
 - Big-O and its relatives, which are written exactly like multiplication.
 - Unknown operator names: `\mathrm{softmax}(x)` is rejected, `\mathrm{log}(x)` is not.
 - Anything with more than four free parameters.

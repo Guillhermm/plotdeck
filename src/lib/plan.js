@@ -12,7 +12,10 @@
   var evaluate = root.PlotDeckEvaluate || (typeof require === 'function' ? require('./evaluate.js') : null);
 
   // Conventional independent variables, most conventional first.
-  var AXIS_PREFERENCE = ['x', 't', 'theta', 'u', 'v', 's', 'r', 'n', 'z', 'y'];
+  var AXIS_PREFERENCE = [
+    'x', 't', 'theta', 'phi', 'psi', 'eta', 'varphi',
+    'u', 'v', 's', 'r', 'n', 'z', 'y'
+  ];
   var MAX_SLIDERS = 4;
 
   // Big-O and its relatives look exactly like multiplication by a symbol.
@@ -79,7 +82,9 @@
       return { ok: false, reason: err.reason || 'parse-failed', detail: err.message };
     }
 
-    if (parts.length > 2) return { ok: false, reason: 'chained-relation' };
+    // a = b = c states a = c as well, and the last form is usually the explicit
+    // one, so read the chain from its outer ends.
+    if (parts.length > 2) parts = [parts[0], parts[parts.length - 1]];
     // A bare expression is still a curve: plot it as y, but only when it names
     // a conventional variable and is more than a single symbol, or every stray
     // letter on the page would become a slide.

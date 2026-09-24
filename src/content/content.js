@@ -13,6 +13,7 @@
   var BOX = { width: 344, height: 176, padLeft: 40, padRight: 8, padTop: 10, padBottom: 20 };
   var MAX_SLIDES = 120;
 
+  var latex = window.PlotDeckLatex;
   var extract = window.PlotDeckExtract;
   var planner = window.PlotDeckPlan;
   var plotter = window.PlotDeckPlot;
@@ -449,29 +450,34 @@
 
   function scan() {
     var items = extract.extract(document);
-    state.found = items.length;
+    state.found = 0;
     state.slides = [];
     state.rejects = {};
 
     items.forEach(function (item) {
-      if (state.slides.length >= MAX_SLIDES) return;
-      var result = planner.plan(item.tex);
-      if (!result.ok) {
-        state.rejects[result.reason] = (state.rejects[result.reason] || 0) + 1;
-        return;
-      }
-      var values = {};
-      result.plan.sliders.forEach(function (slider) { values[slider.name] = slider.value; });
-      state.slides.push({
-        tex: item.tex,
-        element: item.element,
-        source: item.source,
-        plan: result.plan,
-        values: values,
-        baseDomain: { min: result.plan.domain.min, max: result.plan.domain.max },
-        baseFrame: null,
-        zeroCentered: true,
-        view: { x: 0, y: 0 }
+      // A stacked environment holds one equation per line, so it is several
+      // expressions wearing one set of delimiters.
+      latex.splitBlocks(item.tex).forEach(function (piece) {
+        if (state.slides.length >= MAX_SLIDES) return;
+        state.found += 1;
+        var result = planner.plan(piece);
+        if (!result.ok) {
+          state.rejects[result.reason] = (state.rejects[result.reason] || 0) + 1;
+          return;
+        }
+        var values = {};
+        result.plan.sliders.forEach(function (slider) { values[slider.name] = slider.value; });
+        state.slides.push({
+          tex: piece,
+          element: item.element,
+          source: item.source,
+          plan: result.plan,
+          values: values,
+          baseDomain: { min: result.plan.domain.min, max: result.plan.domain.max },
+          baseFrame: null,
+          zeroCentered: true,
+          view: { x: 0, y: 0 }
+        });
       });
     });
   }
