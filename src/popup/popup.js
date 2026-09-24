@@ -8,6 +8,7 @@ const FILES = [
   'src/lib/extract.js',
   'src/lib/deck.js',
   'src/lib/view.js',
+  'src/lib/space.js',
   'src/content/content.js'
 ];
 

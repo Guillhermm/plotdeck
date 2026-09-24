@@ -19,6 +19,36 @@
     return points;
   }
 
+  /**
+   * Samples a function of two variables over a rectangle, for a surface mesh.
+   *
+   * @returns {{a: number[], b: number[], z: number[][]}} z[i][j] is the value at
+   *   a[i], b[j]. Values that are not finite are kept as they are, so the caller
+   *   can leave a hole rather than guess.
+   */
+  function grid(ast, axisA, axisB, domainA, domainB, values, steps) {
+    var count = steps || 24;
+    var scope = Object.assign({}, values || {});
+    var a = new Array(count);
+    var b = new Array(count);
+    var stepA = (domainA.max - domainA.min) / (count - 1);
+    var stepB = (domainB.max - domainB.min) / (count - 1);
+    for (var i = 0; i < count; i += 1) {
+      a[i] = domainA.min + i * stepA;
+      b[i] = domainB.min + i * stepB;
+    }
+    var z = new Array(count);
+    for (var row = 0; row < count; row += 1) {
+      z[row] = new Array(count);
+      scope[axisA] = a[row];
+      for (var column = 0; column < count; column += 1) {
+        scope[axisB] = b[column];
+        z[row][column] = evaluate.evaluate(ast, scope);
+      }
+    }
+    return { a: a, b: b, z: z };
+  }
+
   function quantile(sorted, q) {
     if (!sorted.length) return NaN;
     var index = (sorted.length - 1) * q;
@@ -183,6 +213,7 @@
 
   var api = {
     sample: sample,
+    grid: grid,
     verticalRange: verticalRange,
     unionRange: unionRange,
     combinedRange: combinedRange,

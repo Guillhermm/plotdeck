@@ -42,6 +42,28 @@ Four stages, each of which can be checked on its own.
    vertical lines, and the vertical range is clipped around the median so one
    asymptote cannot flatten the curve.
 
+## Ways to draw a slide
+
+The same plan can be read more than one way, so a slide offers the readings that fit
+it and remembers which one you chose.
+
+- **curve**, or **curves** for a system: each series against the shared parameter.
+  Always available.
+- **parametric**: two series in one parameter are not two curves, they are one curve
+  in the plane. `x=\cos t` with `y=\sin t` is a circle, not two waves.
+- **parametric 3D**: three or more series become a curve in space. When there are
+  more than three lines, three selects say which are x, y and z, so the four
+  hyperspherical coordinates of a 3-sphere can be looked at three at a time.
+- **surface**: an equation whose remaining symbol is itself a conventional variable,
+  such as `z=x^2/a^2+y^2/b^2`, is a surface rather than a family of curves. It is
+  drawn as a wireframe on a 22 by 22 grid, shaded by height, with the lines painted
+  back to front so the far side sits behind the near one.
+
+The spatial views are orthographic rather than perspective, because these are graphs:
+a parallel projection keeps equal steps equal everywhere, so distances can still be
+read off the picture after turning it. **Turn** and **tilt** rotate the scene,
+**zoom** scales it, and the unit cube is drawn so the orientation stays legible.
+
 ## Moving through the deck
 
 One slide at a time, never a scrolling list. Only the current slide is built, so a
@@ -126,9 +148,10 @@ skipped: `trivial-expression`, `implicit-relation`, `chained-relation`,
 - Implicit relations such as `x^2+y^2=1`, which need a contour, not a curve. This
   also catches set-builder definitions, which look like equations but define a
   membership rather than a value.
-- Anything in three dimensions or more. A surface `z=f(x,y)` and a parametric
-  surface are both refused, and a 3-sphere could not be drawn even with a surface
-  renderer, since it is a hypersurface in four dimensions.
+- Implicit surfaces. `x^2+y^2+z^2=r^2` needs to be solved or marched before it can
+  be drawn, and a 3-sphere cannot be drawn at all, since it is a hypersurface in four
+  dimensions and any picture of it is a projection chosen by hand.
+- Parametric surfaces, which need two parameters rather than one.
 - Big-O and its relatives, which are written exactly like multiplication.
 - Unknown operator names: `\mathrm{softmax}(x)` is rejected, `\mathrm{log}(x)` is not.
 - Anything with more than four free parameters.
@@ -152,7 +175,7 @@ skipped: `trivial-expression`, `implicit-relation`, `chained-relation`,
 ## Development
 
 ```sh
-npm test          # 62 tests, node:test, no dependencies
+npm test          # 99 tests, node:test, no dependencies
 npm run icons     # regenerates src/images/*.png
 ```
 
@@ -163,4 +186,5 @@ npm run icons     # regenerates src/images/*.png
 - `src/lib/extract.js`: the DOM sources.
 - `src/lib/deck.js`: navigation arithmetic and the swipe verdict, pure.
 - `src/lib/view.js`: the axis windows, scaled about their centre, pure.
+- `src/lib/space.js`: projection, normalisation and depth ordering, pure.
 - `src/content/content.js`: the drawer, in a shadow root.

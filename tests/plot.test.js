@@ -140,6 +140,24 @@ test('combinedRange copes with a series that has nothing finite', () => {
   assert.equal(plot.combinedRange([empty]), null);
 });
 
+test('grid samples a function of two variables', () => {
+  const { plan } = require('../src/lib/plan.js');
+  const ast = plan('z=x^2+y^2').plan.series[0].ast;
+  const mesh = plot.grid(ast, 'x', 'y', { min: -2, max: 2 }, { min: -2, max: 2 }, {}, 5);
+  assert.equal(mesh.a.length, 5);
+  assert.equal(mesh.z.length, 5);
+  assert.equal(mesh.z[2][2], 0, 'the centre of the paraboloid');
+  assert.equal(mesh.z[0][0], 8, 'the far corner');
+  assert.equal(mesh.z[0][4], 8, 'and the opposite one');
+});
+
+test('grid keeps what is not finite rather than guessing', () => {
+  const { plan } = require('../src/lib/plan.js');
+  const ast = plan('z=\\frac{1}{x}+y').plan.series[0].ast;
+  const mesh = plot.grid(ast, 'x', 'y', { min: -1, max: 1 }, { min: 0, max: 1 }, {}, 3);
+  assert.ok(!Number.isFinite(mesh.z[1][0]), 'the pole at x = 0 stays a hole');
+});
+
 test('format keeps numbers short', () => {
   assert.equal(plot.format(3.14159), '3.142');
   assert.equal(plot.format(120000), '1.2e+5');

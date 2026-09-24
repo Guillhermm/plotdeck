@@ -162,6 +162,32 @@ test('a group refuses more parameters than it can show', () => {
   assert.equal(groupPlans(plans).reason, 'too-many-parameters');
 });
 
+test('modes follow from the shape of the plan', () => {
+  const { modesFor } = require('../src/lib/plan.js');
+  const ids = (tex) => modesFor(plan(tex).plan).map((m) => m.id);
+  assert.deepEqual(ids('y=kx'), ['series'], 'k is not a conventional variable');
+  assert.deepEqual(ids('z=x^2+y^2'), ['series', 'surface']);
+  assert.equal(modesFor(plan('z=x^2+y^2').plan)[1].second, 'y');
+});
+
+test('two lines in one parameter can be read as a curve in the plane', () => {
+  const latex = require('../src/lib/latex.js');
+  const { groupPlans, modesFor } = require('../src/lib/plan.js');
+  const block = '\\begin{aligned}x&=\\cos t\\\\y&=\\sin t\\end{aligned}';
+  const plans = latex.splitBlocks(block).map((p) => plan(p)).filter((r) => r.ok).map((r) => r.plan);
+  const group = groupPlans(plans);
+  assert.deepEqual(modesFor(group.plan).map((m) => m.id), ['series', 'parametric2d']);
+});
+
+test('three or more lines can be read as a curve in space', () => {
+  const latex = require('../src/lib/latex.js');
+  const { groupPlans, modesFor } = require('../src/lib/plan.js');
+  const block = '\\begin{aligned}x&=\\cos t\\\\y&=\\sin t\\\\z&=t\\end{aligned}';
+  const plans = latex.splitBlocks(block).map((p) => plan(p)).filter((r) => r.ok).map((r) => r.plan);
+  assert.deepEqual(modesFor(groupPlans(plans).plan).map((m) => m.id),
+    ['series', 'parametric3d']);
+});
+
 test('plans carry an evaluable tree', () => {
   const result = plan('y=x^2');
   const { evaluate } = require('../src/lib/evaluate.js');

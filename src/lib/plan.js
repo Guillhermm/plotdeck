@@ -272,8 +272,38 @@
     };
   }
 
+  /**
+   * The ways a plan can be drawn.
+   *
+   * A system of lines in one parameter is a set of curves, but two of those
+   * lines are also a curve in the plane and three are a curve in space. An
+   * equation whose remaining symbol is itself a conventional variable is a
+   * surface rather than a family of curves.
+   *
+   * @returns {Array<{id: string, label: string, second?: string}>}
+   */
+  function modesFor(plan) {
+    var modes = [{ id: 'series', label: plan.series.length > 1 ? 'curves' : 'curve' }];
+    if (plan.series.length === 2) {
+      modes.push({ id: 'parametric2d', label: 'parametric' });
+    }
+    if (plan.series.length >= 3) {
+      modes.push({ id: 'parametric3d', label: 'parametric 3D' });
+    }
+    if (plan.series.length === 1) {
+      for (var i = 0; i < plan.sliders.length; i += 1) {
+        if (AXIS_PREFERENCE.indexOf(plan.sliders[i].name) !== -1) {
+          modes.push({ id: 'surface', label: 'surface', second: plan.sliders[i].name });
+          break;
+        }
+      }
+    }
+    return modes;
+  }
+
   var api = {
     plan: plan,
+    modesFor: modesFor,
     planExpression: planExpression,
     groupPlans: groupPlans,
     readLeftSide: readLeftSide,

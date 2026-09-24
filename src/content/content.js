@@ -11,6 +11,8 @@
   var SVG_NS = 'http://www.w3.org/2000/svg';
   // Asymmetric padding: the left gutter and the strip below hold tick labels.
   var BOX = { width: 344, height: 176, padLeft: 40, padRight: 8, padTop: 10, padBottom: 20 };
+  // A projected cube needs room in both directions, so the spatial views are taller.
+  var BOX3D = { width: 344, height: 264 };
   var MAX_SLIDES = 120;
 
   var latex = window.PlotDeckLatex;
@@ -19,6 +21,7 @@
   var plotter = window.PlotDeckPlot;
   var deck = window.PlotDeckDeck;
   var viewer = window.PlotDeckView;
+  var space = window.PlotDeckSpace;
 
   var state = {
     host: null,
@@ -70,6 +73,12 @@
     '.sliders { margin-top: 10px; display: grid; gap: 7px; }',
     '.slider { display: grid; grid-template-columns: 62px 1fr 44px; align-items: center; gap: 8px; }',
     '.axes { margin-top: 12px; padding-top: 10px; border-top: 1px solid #1b2430; }',
+    '.modes { display: flex; gap: 6px; margin-bottom: 10px; }',
+    'button.mini.on { border-color: #4f9dfd; color: #4f9dfd; }',
+    '.picks { display: flex; gap: 10px; margin-top: 10px; }',
+    '.pick { display: flex; align-items: center; gap: 5px; color: #7d8b9a; font-size: 11px; }',
+    '.pick select { background: #0d1117; color: #e6edf3; border: 1px solid #2c3a4a;',
+    '  border-radius: 4px; padding: 2px 4px; font: 11px ui-monospace, Menlo, monospace; }',
     '.slider span { font: 12px ui-monospace, Menlo, monospace; color: #9fb0c0; }',
     '.slider output { font: 11px ui-monospace, Menlo, monospace; color: #e6edf3; text-align: right; }',
     'input[type=range] { width: 100%; accent-color: #4f9dfd; }',
@@ -150,7 +159,7 @@
 
   var SERIES_COLORS = ['#4f9dfd', '#e3b341', '#7ee787', '#ff7b72', '#d2a8ff', '#79c0ff'];
 
-  function drawPlot(slide) {
+  function drawSeries(slide) {
     var domain = viewer.zoom(
       viewer.frameFor(slide.baseDomain, slide.zeroCentered),
       viewer.factorFor(slide.view.x)
@@ -263,6 +272,309 @@
     return { svg: svg, geo: reference, escapes: escapes };
   }
 
+  /** Blends two hex colours, for shading a mesh by height. */
+  function blend(from, to, amount) {
+    var parse = function (hex) {
+      return [1, 3, 5].map(function (offset) { return parseInt(hex.substr(offset, 2), 16); });
+    };
+    var a = parse(from);
+    var b = parse(to);
+    var mix = a.map(function (channel, index) {
+      return Math.round(channel + (b[index] - channel) * Math.max(0, Math.min(1, amount)));
+    });
+    return 'rgb(' + mix.join(',') + ')';
+  }
+
+  function emptyPlot(message) {
+    var svg = svgEl('svg', {
+      width: BOX.width, height: BOX.height,
+      viewBox: '0 0 ' + BOX.width + ' ' + BOX.height
+    });
+    svg.appendChild(svgEl('rect', { x: 0, y: 0, width: BOX.width, height: BOX.height, fill: '#0d1117' }));
+    var note = svgEl('text', {
+      x: BOX.width / 2, y: BOX.height / 2, fill: '#7d8b9a',
+      'font-size': 12, 'text-anchor': 'middle'
+    });
+    note.textContent = message;
+    svg.appendChild(note);
+    return { svg: svg, geo: null, escapes: false };
+  }
+
+  /**
+   * Screen placement shared by every spatial view. The zoom is its own control
+   * rather than the vertical range, which in a surface belongs to the second
+   * ground axis.
+   */
+  function camera(slide) {
+    var yaw = (slide.view.yaw || 0) * Math.PI / 180;
+    var pitch = (slide.view.pitch || 0) * Math.PI / 180;
+    var inner = Math.min(BOX3D.width - 16, BOX3D.height - 24);
+    // 1.5 rather than the worst case of sqrt(3): a corner-on cube may graze the
+    // edge, which is a better trade than a small picture at every other angle.
+    var scale = (inner / 2 / 1.5) * viewer.factorFor(slide.view.zoom || 0);
+    var originX = BOX3D.width / 2;
+    var originY = BOX3D.height / 2;
+    return {
+      place: function (point) {
+        var p = space.project(point, yaw, pitch);
+        return { x: originX + p.x * scale, y: originY - p.y * scale, depth: p.depth };
+      }
+    };
+  }
+
+  function drawBox(svg, view) {
+    space.boxEdges().forEach(function (edge) {
+      var a = view.place(edge[0]);
+      var b = view.place(edge[1]);
+      svg.appendChild(svgEl('line', {
+        x1: a.x.toFixed(2), y1: a.y.toFixed(2), x2: b.x.toFixed(2), y2: b.y.toFixed(2),
+        stroke: '#24313f', 'stroke-width': 1
+      }));
+    });
+  }
+
+  function newSvg() {
+    return svgEl('svg', {
+      width: BOX3D.width, height: BOX3D.height,
+      viewBox: '0 0 ' + BOX3D.width + ' ' + BOX3D.height
+    });
+  }
+
+  function parameterDomain(slide) {
+    return viewer.zoom(
+      viewer.frameFor(slide.baseDomain, slide.zeroCentered),
+      viewer.factorFor(slide.view.x)
+    );
+  }
+
+  function sampleSeries(slide, item, domain) {
+    return plotter.sample({ axis: slide.plan.axis, ast: item.ast, domain: domain }, slide.values);
+  }
+
+  /** Two series read as one curve in the plane: x against y, not both against t. */
+  function drawParametric2d(slide) {
+    var domain = parameterDomain(slide);
+    var pair = slide.plan.series.slice(0, 2);
+    var xs = sampleSeries(slide, pair[0], domain).map(function (p) { return p.y; });
+    var ys = sampleSeries(slide, pair[1], domain).map(function (p) { return p.y; });
+    var xRange = space.bounds(xs);
+    var yRange = space.bounds(ys);
+    if (!xRange || !yRange) return emptyPlot('no finite values in this range');
+
+    var inner = Math.min(BOX3D.width - 40, BOX3D.height - 34);
+    var scale = (inner / 2) * viewer.factorFor(slide.view.zoom || 0);
+    var originX = BOX3D.width / 2;
+    var originY = BOX3D.height / 2 - 6;
+    var place = function (x, y) {
+      return {
+        x: originX + space.normalize(x, xRange) * scale,
+        y: originY - space.normalize(y, yRange) * scale
+      };
+    };
+
+    var svg = newSvg();
+    var frame = svgEl('rect', {
+      x: originX - scale, y: originY - scale, width: scale * 2, height: scale * 2,
+      fill: 'none', stroke: '#1b2430', 'stroke-width': 1
+    });
+    svg.appendChild(frame);
+
+    var segments = [];
+    var current = [];
+    for (var i = 0; i < xs.length; i += 1) {
+      if (!Number.isFinite(xs[i]) || !Number.isFinite(ys[i])) {
+        if (current.length > 1) segments.push(current.join(' '));
+        current = [];
+        continue;
+      }
+      var point = place(xs[i], ys[i]);
+      current.push((current.length ? 'L' : 'M') + point.x.toFixed(2) + ',' + point.y.toFixed(2));
+    }
+    if (current.length > 1) segments.push(current.join(' '));
+    segments.forEach(function (d) {
+      svg.appendChild(svgEl('path', {
+        d: d, fill: 'none', stroke: '#4f9dfd', 'stroke-width': 1.8, 'stroke-linejoin': 'round'
+      }));
+    });
+
+    var label = svgEl('text', {
+      x: 6, y: BOX3D.height - 6, fill: '#7d8b9a', 'font-size': 9,
+      'font-family': 'ui-monospace, Menlo, monospace'
+    });
+    label.textContent = pair[0].label + ' horizontal, ' + pair[1].label + ' vertical';
+    svg.appendChild(label);
+    return {
+      svg: svg,
+      geo: null,
+      escapes: false,
+      readout: pair[0].label + ': ' + plotter.format(xRange.min) + ' to ' + plotter.format(xRange.max)
+        + '    ' + pair[1].label + ': ' + plotter.format(yRange.min) + ' to ' + plotter.format(yRange.max)
+    };
+  }
+
+  /** Three series read as one curve in space. */
+  function drawParametric3d(slide) {
+    var domain = parameterDomain(slide);
+    var picked = slide.axesPick.map(function (index) { return slide.plan.series[index]; });
+    var tracks = picked.map(function (item) {
+      return sampleSeries(slide, item, domain).map(function (p) { return p.y; });
+    });
+    var ranges = tracks.map(function (values) { return space.bounds(values); });
+    if (ranges.some(function (range) { return !range; })) {
+      return emptyPlot('no finite values in this range');
+    }
+
+    var view = camera(slide);
+    var svg = newSvg();
+    drawBox(svg, view);
+
+    var segments = [];
+    var current = [];
+    for (var i = 0; i < tracks[0].length; i += 1) {
+      var finite = tracks.every(function (values) { return Number.isFinite(values[i]); });
+      if (!finite) {
+        if (current.length > 1) segments.push(current.join(' '));
+        current = [];
+        continue;
+      }
+      var point = view.place({
+        x: space.normalize(tracks[0][i], ranges[0]),
+        y: space.normalize(tracks[1][i], ranges[1]),
+        z: space.normalize(tracks[2][i], ranges[2])
+      });
+      current.push((current.length ? 'L' : 'M') + point.x.toFixed(2) + ',' + point.y.toFixed(2));
+    }
+    if (current.length > 1) segments.push(current.join(' '));
+    segments.forEach(function (d) {
+      svg.appendChild(svgEl('path', {
+        d: d, fill: 'none', stroke: '#4f9dfd', 'stroke-width': 1.8, 'stroke-linejoin': 'round'
+      }));
+    });
+
+    var label = svgEl('text', {
+      x: 6, y: BOX3D.height - 6, fill: '#7d8b9a', 'font-size': 9,
+      'font-family': 'ui-monospace, Menlo, monospace'
+    });
+    label.textContent = picked.map(function (item) { return item.label; }).join(' , ');
+    svg.appendChild(label);
+    return { svg: svg, geo: null, escapes: false, readout: label.textContent + '  as x, y, z' };
+  }
+
+  /** A function of two variables, drawn as a wireframe. */
+  function drawSurface(slide) {
+    var mode = currentMode(slide);
+    var axisB = mode.second;
+    var domainA = parameterDomain(slide);
+    var domainB = viewer.zoom(
+      viewer.frameFor(slide.baseDomain, slide.zeroCentered),
+      viewer.factorFor(slide.view.y)
+    );
+    var mesh = plotter.grid(
+      slide.plan.series[0].ast, slide.plan.axis, axisB, domainA, domainB, slide.values, 22
+    );
+
+    var flat = [];
+    mesh.z.forEach(function (row) {
+      row.forEach(function (value) { flat.push({ x: 0, y: value }); });
+    });
+    var zRange = plotter.verticalRange(flat);
+    if (!zRange) return emptyPlot('no finite values in this range');
+
+    var view = camera(slide);
+    var svg = newSvg();
+    drawBox(svg, view);
+
+    var count = mesh.a.length;
+    var vertexAt = function (row, column) {
+      var value = mesh.z[row][column];
+      if (!Number.isFinite(value)) return null;
+      return view.place({
+        x: space.normalize(mesh.a[row], domainA),
+        y: space.normalize(mesh.b[column], domainB),
+        z: Math.max(-1, Math.min(1, space.normalize(value, zRange)))
+      });
+    };
+
+    var lines = [];
+    var addLine = function (points, height) {
+      var segments = [];
+      var current = [];
+      points.forEach(function (point) {
+        if (!point) {
+          if (current.length > 1) segments.push(current.join(' '));
+          current = [];
+          return;
+        }
+        current.push((current.length ? 'L' : 'M') + point.x.toFixed(2) + ',' + point.y.toFixed(2));
+      });
+      if (current.length > 1) segments.push(current.join(' '));
+      if (!segments.length) return;
+      var visible = points.filter(Boolean);
+      var depth = visible.reduce(function (total, p) { return total + p.depth; }, 0) / visible.length;
+      lines.push({ d: segments.join(' '), depth: depth, height: height });
+    };
+
+    for (var row = 0; row < count; row += 1) {
+      var across = [];
+      var heights = [];
+      for (var column = 0; column < count; column += 1) {
+        across.push(vertexAt(row, column));
+        if (Number.isFinite(mesh.z[row][column])) heights.push(mesh.z[row][column]);
+      }
+      addLine(across, heights.length ? space.normalize(
+        heights.reduce(function (a, b) { return a + b; }, 0) / heights.length, zRange) : 0);
+    }
+    for (var column2 = 0; column2 < count; column2 += 1) {
+      var down = [];
+      var heights2 = [];
+      for (var row2 = 0; row2 < count; row2 += 1) {
+        down.push(vertexAt(row2, column2));
+        if (Number.isFinite(mesh.z[row2][column2])) heights2.push(mesh.z[row2][column2]);
+      }
+      addLine(down, heights2.length ? space.normalize(
+        heights2.reduce(function (a, b) { return a + b; }, 0) / heights2.length, zRange) : 0);
+    }
+
+    space.sortByDepth(lines).forEach(function (line) {
+      svg.appendChild(svgEl('path', {
+        d: line.d, fill: 'none',
+        stroke: blend('#4f9dfd', '#e3b341', (line.height + 1) / 2),
+        'stroke-width': 1, 'stroke-linejoin': 'round', opacity: 0.9
+      }));
+    });
+
+    var label = svgEl('text', {
+      x: 6, y: BOX3D.height - 6, fill: '#7d8b9a', 'font-size': 9,
+      'font-family': 'ui-monospace, Menlo, monospace'
+    });
+    label.textContent = slide.plan.axis + ' , ' + axisB + '  ->  ' + slide.plan.label;
+    svg.appendChild(label);
+    return {
+      svg: svg,
+      geo: null,
+      escapes: false,
+      readout: slide.plan.axis + ': ' + plotter.format(domainA.min) + ' to ' + plotter.format(domainA.max)
+        + '    ' + axisB + ': ' + plotter.format(domainB.min) + ' to ' + plotter.format(domainB.max)
+        + '    ' + slide.plan.label + ': ' + plotter.format(zRange.min) + ' to ' + plotter.format(zRange.max)
+    };
+  }
+
+  function currentMode(slide) {
+    var modes = planner.modesFor(slide.plan);
+    for (var i = 0; i < modes.length; i += 1) {
+      if (modes[i].id === slide.mode) return modes[i];
+    }
+    return modes[0];
+  }
+
+  function drawPlot(slide) {
+    var mode = currentMode(slide);
+    if (mode.id === 'parametric2d') return drawParametric2d(slide);
+    if (mode.id === 'parametric3d') return drawParametric3d(slide);
+    if (mode.id === 'surface') return drawSurface(slide);
+    return drawSeries(slide);
+  }
+
   function buildLegend(series) {
     var legend = el('div', 'legend');
     series.forEach(function (item, index) {
@@ -295,7 +607,24 @@
     });
     card.appendChild(rendered);
 
-    if (slide.plan.series.length > 1) card.appendChild(buildLegend(slide.plan.series));
+    var modes = planner.modesFor(slide.plan);
+    if (modes.length > 1) {
+      var picker = el('div', 'modes');
+      modes.forEach(function (mode) {
+        var button = el('button', 'mini' + (mode.id === currentMode(slide).id ? ' on' : ''), mode.label);
+        button.addEventListener('click', function () {
+          slide.mode = mode.id;
+          slide.baseFrame = null;
+          goTo(state.index, 0);
+        });
+        picker.appendChild(button);
+      });
+      card.appendChild(picker);
+    }
+
+    if (currentMode(slide).id === 'series' && slide.plan.series.length > 1) {
+      card.appendChild(buildLegend(slide.plan.series));
+    }
 
     var figureHead = el('div', 'figure-head');
     var warn = el('span', 'warn', '');
@@ -328,6 +657,10 @@
       var drawn = drawPlot(slide);
       figure.replaceChildren(drawn.svg);
       warn.textContent = drawn.escapes ? 'curve leaves the frame' : '';
+      if (drawn.readout) {
+        meta.textContent = drawn.readout;
+        return;
+      }
       if (!drawn.geo) {
         meta.textContent = 'nothing finite in this window';
         return;
@@ -381,24 +714,74 @@
       card.appendChild(sliders);
     }
 
-    // Every slide gets these: one span control per axis. They scale the window
-    // about its own centre, so the curve stays centred instead of drifting the
-    // way a pair of typed bounds lets it.
+    // The view controls depend on how the slide is being drawn.
     var axes = el('div', 'sliders axes');
     var zoomConfig = function (position) {
       return {
         min: -viewer.STEPS, max: viewer.STEPS, step: 1, value: position,
         readout: function (value) {
           var factor = viewer.factorFor(value);
-          return (factor >= 100 || factor < 0.1 ? factor.toPrecision(2) : String(Math.round(factor * 100) / 100)) + 'x';
+          return (factor >= 100 || factor < 0.1 ? factor.toPrecision(2)
+            : String(Math.round(factor * 100) / 100)) + 'x';
         }
       };
     };
-    axes.appendChild(sliderRow(slide.plan.axis + ' range', zoomConfig(slide.view.x),
+    var angleConfig = function (value) {
+      return {
+        min: -180, max: 180, step: 5, value: value,
+        readout: function (degrees) { return degrees + '\u00b0'; }
+      };
+    };
+
+    var mode = currentMode(slide);
+    var spanLabel = mode.id === 'series' ? slide.plan.axis + ' range' : slide.plan.axis + ' range';
+    axes.appendChild(sliderRow(spanLabel, zoomConfig(slide.view.x),
       function (value) { slide.view.x = value; }));
-    axes.appendChild(sliderRow('y range', zoomConfig(slide.view.y),
-      function (value) { slide.view.y = value; }));
+
+    if (mode.id === 'series') {
+      axes.appendChild(sliderRow('y range', zoomConfig(slide.view.y),
+        function (value) { slide.view.y = value; }));
+    } else if (mode.id === 'surface') {
+      axes.appendChild(sliderRow(mode.second + ' range', zoomConfig(slide.view.y),
+        function (value) { slide.view.y = value; }));
+    }
+
+    if (mode.id !== 'series') {
+      axes.appendChild(sliderRow('zoom', zoomConfig(slide.view.zoom || 0),
+        function (value) { slide.view.zoom = value; }));
+    }
+
+    if (mode.id === 'surface' || mode.id === 'parametric3d') {
+      axes.appendChild(sliderRow('turn', angleConfig(slide.view.yaw),
+        function (value) { slide.view.yaw = value; }));
+      axes.appendChild(sliderRow('tilt', angleConfig(slide.view.pitch),
+        function (value) { slide.view.pitch = value; }));
+    }
     card.appendChild(axes);
+
+    // With more than three lines available, say which three are the axes.
+    if (mode.id === 'parametric3d' && slide.plan.series.length > 3) {
+      var pickRow = el('div', 'picks');
+      ['x', 'y', 'z'].forEach(function (name, position) {
+        var wrap = el('label', 'pick');
+        wrap.appendChild(el('span', null, name));
+        var select = document.createElement('select');
+        slide.plan.series.forEach(function (item, index) {
+          var option = document.createElement('option');
+          option.value = String(index);
+          option.textContent = item.label;
+          if (index === slide.axesPick[position]) option.selected = true;
+          select.appendChild(option);
+        });
+        select.addEventListener('change', function () {
+          slide.axesPick[position] = Number(select.value);
+          redraw();
+        });
+        wrap.appendChild(select);
+        pickRow.appendChild(wrap);
+      });
+      card.appendChild(pickRow);
+    }
 
     redraw();
     return card;
@@ -546,7 +929,9 @@
         baseDomain: { min: plan.domain.min, max: plan.domain.max },
         baseFrame: null,
         zeroCentered: true,
-        view: { x: 0, y: 0 }
+        mode: 'series',
+        axesPick: [0, 1, 2],
+        view: { x: 0, y: 0, zoom: 0, yaw: 35, pitch: 25 }
       });
     }
 
