@@ -9,6 +9,8 @@ const FILES = [
   'src/lib/deck.js',
   'src/lib/view.js',
   'src/lib/space.js',
+  'src/lib/strings.js',
+  'src/lib/session.js',
   'src/content/content.js'
 ];
 
@@ -95,6 +97,14 @@ async function onToggle() {
   }
 }
 
+/** True when this page has been scanned before, so the deck can just open. */
+async function seenBefore(url) {
+  if (!url) return false;
+  const withoutHash = url.split('#')[0];
+  const { plotdeck } = await chrome.storage.local.get('plotdeck');
+  return !!(plotdeck && plotdeck[withoutHash]);
+}
+
 async function init() {
   const tab = await currentTab();
   if (restricted(tab)) {
@@ -102,8 +112,14 @@ async function init() {
     els.toggle.disabled = true;
     return;
   }
-  render(await send(tab.id, { type: 'plotdeck:status' }));
   els.toggle.addEventListener('click', onToggle);
+
+  const status = await send(tab.id, { type: 'plotdeck:status' });
+  render(status);
+  // Nothing to decide on a page that was read before: open it.
+  if (!(status && status.open) && await seenBefore(tab.url)) {
+    onToggle();
+  }
 }
 
 init();

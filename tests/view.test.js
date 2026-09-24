@@ -93,6 +93,29 @@ test('zooming a zero centred window keeps zero in the middle', () => {
   }
 });
 
+test('a window that already holds the curve is left exactly as it was', () => {
+  const frame = { min: -1, max: 1 };
+  assert.equal(view.expandToHold(frame, { min: -0.5, max: 0.5 }), frame);
+  assert.equal(view.expandToHold(frame, { min: -1, max: 1 }), frame);
+});
+
+test('a window grows past what it has to hold, so growth keeps reading as growth', () => {
+  const grown = view.expandToHold({ min: -1, max: 1 }, { min: -3, max: 3 });
+  assert.ok(grown.min < -3 && grown.max > 3);
+  assert.equal(view.center(grown), 0);
+});
+
+test('growing only reacts to leaving, never to shrinking', () => {
+  const frame = { min: -5, max: 5 };
+  assert.equal(view.expandToHold(frame, { min: -0.1, max: 0.1 }), frame);
+});
+
+test('growing copes with nothing to hold', () => {
+  const frame = { min: -1, max: 1 };
+  assert.equal(view.expandToHold(frame, null), frame);
+  assert.deepEqual(view.expandToHold(null, { min: 0, max: 2 }), { min: 0, max: 2 });
+});
+
 test('positions are clamped to the ends of the slider', () => {
   assert.equal(view.clampPosition(-99), -view.STEPS);
   assert.equal(view.clampPosition(99), view.STEPS);

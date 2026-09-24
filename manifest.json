@@ -3,7 +3,11 @@
   "name": "Plot deck",
   "version": "0.1.0",
   "description": "Finds every equation on a page and draws it, with a slider for each parameter. No model, no network.",
-  "permissions": ["activeTab", "scripting"],
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
   "action": {
     "default_popup": "src/popup/popup.html",
     "default_title": "Plot the equations on this page"

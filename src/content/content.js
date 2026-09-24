@@ -22,6 +22,8 @@
   var deck = window.PlotDeckDeck;
   var viewer = window.PlotDeckView;
   var space = window.PlotDeckSpace;
+  var sessions = window.PlotDeckSession;
+  var t = window.PlotDeckStrings.translator(window.PlotDeckStrings.pageLocale(document));
 
   var state = {
     host: null,
@@ -83,8 +85,8 @@
     '.slider output { font: 11px ui-monospace, Menlo, monospace; color: #e6edf3; text-align: right; }',
     'input[type=range] { width: 100%; accent-color: #4f9dfd; }',
     '.meta { color: #7d8b9a; font-size: 11px; margin-top: 8px; }',
-    '.figure-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }',
-    '.figure-head .spacer { flex: 1; }',
+    '.figure-foot { display: flex; align-items: center; gap: 10px; margin-top: 8px; }',
+    '.figure-foot .spacer { flex: 1; }',
     '.warn { color: #e3b341; font-size: 11px; }',
     '.toggle { display: flex; align-items: center; gap: 4px; color: #7d8b9a;',
     '  font-size: 11px; cursor: pointer; user-select: none; }',
@@ -100,7 +102,22 @@
     '.summary dl { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px;',
     '  margin: 0; padding: 0 14px 12px; max-height: 132px; overflow-y: auto; }',
     '.summary dt { color: #7d8b9a; } .summary dd { margin: 0; font-variant-numeric: tabular-nums; }',
-    '.empty { color: #8b99a8; padding: 28px 14px; text-align: center; }'
+    '.empty { color: #8b99a8; padding: 28px 14px; text-align: center; }',
+    '.card, .summary dl { scrollbar-width: thin; scrollbar-color: #2c3a4a transparent; }',
+    '.rendered { scrollbar-width: thin; scrollbar-color: #c3ced8 transparent; }',
+    '.card::-webkit-scrollbar, .summary dl::-webkit-scrollbar,',
+    '.rendered::-webkit-scrollbar { width: 10px; height: 10px; }',
+    '.card::-webkit-scrollbar-track, .summary dl::-webkit-scrollbar-track,',
+    '.rendered::-webkit-scrollbar-track { background: transparent; }',
+    '.card::-webkit-scrollbar-thumb, .summary dl::-webkit-scrollbar-thumb {',
+    '  background: #2c3a4a; border-radius: 6px; border: 3px solid transparent;',
+    '  background-clip: content-box; }',
+    '.card::-webkit-scrollbar-thumb:hover, .summary dl::-webkit-scrollbar-thumb:hover {',
+    '  background: #3d5068; background-clip: content-box; }',
+    '.rendered::-webkit-scrollbar-thumb { background: #c3ced8; border-radius: 6px;',
+    '  border: 3px solid transparent; background-clip: content-box; }',
+    '.rendered::-webkit-scrollbar-thumb:hover { background: #9fb0c0; background-clip: content-box; }',
+    '.card::-webkit-scrollbar-corner, .rendered::-webkit-scrollbar-corner { background: transparent; }'
   ].join('\n');
 
   /** Clipboard needs a user gesture, which a click on the formula is. */
@@ -129,6 +146,65 @@
       done();
     } catch (err) { /* nothing more to try */ }
     area.remove();
+  }
+
+  var STORE = 'plotdeck';
+  var saveTimer = null;
+
+  function storageReady() {
+    return typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
+  }
+
+  function sessionKey() {
+    return sessions.normalizeUrl(location.href);
+  }
+
+  /** Keeps what the viewer did with this page, not the equations themselves. */
+  function remember(immediate) {
+    if (!storageReady() || !state.slides.length) return;
+    var record = sessions.captureState(state.slides, state.index);
+    var key = sessionKey();
+    var write = function () {
+      chrome.storage.local.get(STORE, function (data) {
+        var store = (data && data[STORE]) || {};
+        store[key] = record;
+        var payload = {};
+        payload[STORE] = sessions.prune(store);
+        chrome.storage.local.set(payload);
+      });
+    };
+    clearTimeout(saveTimer);
+    if (immediate) {
+      write();
+      return;
+    }
+    saveTimer = setTimeout(write, 400);
+  }
+
+  function recall(done) {
+    if (!storageReady()) {
+      done(null);
+      return;
+    }
+    chrome.storage.local.get(STORE, function (data) {
+      var store = (data && data[STORE]) || {};
+      done(store[sessionKey()] || null);
+    });
+  }
+
+  function forget(done) {
+    if (!storageReady()) {
+      done();
+      return;
+    }
+    var key = sessionKey();
+    chrome.storage.local.get(STORE, function (data) {
+      var store = (data && data[STORE]) || {};
+      delete store[key];
+      var payload = {};
+      payload[STORE] = store;
+      chrome.storage.local.set(payload, done);
+    });
   }
 
   function el(tag, className, text) {
@@ -172,11 +248,14 @@
       );
     });
 
-    // The frame is measured once per slide and then held, so moving a scale
-    // parameter moves the curve instead of silently rescaling the axis.
-    if (!slide.baseFrame) {
-      slide.baseFrame = plotter.combinedRange(pointsList);
-    }
+    // The frame is measured once and then held, so moving a scale parameter
+    // moves the curve instead of silently rescaling the axis. It does grow when
+    // the curve outgrows it, with headroom, so a parameter can be pushed a long
+    // way without the curve disappearing off the top.
+    var natural = plotter.combinedRange(pointsList);
+    slide.baseFrame = slide.baseFrame
+      ? viewer.expandToHold(slide.baseFrame, natural)
+      : natural;
     var frame = slide.baseFrame
       ? viewer.zoom(
         viewer.frameFor(slide.baseFrame, slide.zeroCentered),
@@ -201,7 +280,7 @@
         x: BOX.width / 2, y: BOX.height / 2, fill: '#7d8b9a',
         'font-size': 12, 'text-anchor': 'middle'
       });
-      note.textContent = 'no finite values in this range';
+      note.textContent = t('noFinite');
       svg.appendChild(note);
       return { svg: svg, geo: null, escapes: false };
     }
@@ -359,7 +438,7 @@
     var ys = sampleSeries(slide, pair[1], domain).map(function (p) { return p.y; });
     var xRange = space.bounds(xs);
     var yRange = space.bounds(ys);
-    if (!xRange || !yRange) return emptyPlot('no finite values in this range');
+    if (!xRange || !yRange) return emptyPlot(t('noFinite'));
 
     var inner = Math.min(BOX3D.width - 40, BOX3D.height - 34);
     var scale = (inner / 2) * viewer.factorFor(slide.view.zoom || 0);
@@ -421,7 +500,7 @@
     });
     var ranges = tracks.map(function (values) { return space.bounds(values); });
     if (ranges.some(function (range) { return !range; })) {
-      return emptyPlot('no finite values in this range');
+      return emptyPlot(t('noFinite'));
     }
 
     var view = camera(slide);
@@ -478,7 +557,7 @@
       row.forEach(function (value) { flat.push({ x: 0, y: value }); });
     });
     var zRange = plotter.verticalRange(flat);
-    if (!zRange) return emptyPlot('no finite values in this range');
+    if (!zRange) return emptyPlot(t('noFinite'));
 
     var view = camera(slide);
     var svg = newSvg();
@@ -590,15 +669,15 @@
 
   function buildCard(slide) {
     var card = el('div', 'card');
-    var kindLabel = slide.plan.kind === 'expression' ? 'expression, plotted as y'
-      : slide.plan.kind === 'system' ? slide.plan.series.length + ' equations, shared axis'
-        : 'equation';
+    var kindLabel = slide.plan.kind === 'expression' ? t('expression')
+      : slide.plan.kind === 'system' ? t('system', slide.plan.series.length)
+        : t('equation');
     card.appendChild(el('div', 'kind', kindLabel));
 
     var rendered = el('div', 'rendered');
-    rendered.title = 'Click to copy the LaTeX';
+    rendered.title = t('copyHint');
     rendered.appendChild(cloneSource(slide.element));
-    var copied = el('span', 'copied', 'copied');
+    var copied = el('span', 'copied', t('copied'));
     rendered.appendChild(copied);
     rendered.addEventListener('click', function () {
       // A swipe that begins on the formula should not also copy it.
@@ -611,11 +690,19 @@
     if (modes.length > 1) {
       var picker = el('div', 'modes');
       modes.forEach(function (mode) {
-        var button = el('button', 'mini' + (mode.id === currentMode(slide).id ? ' on' : ''), mode.label);
+        var names = {
+          series: slide.plan.series.length > 1 ? t('modeCurves') : t('modeCurve'),
+          parametric2d: t('modeParametric'),
+          parametric3d: t('modeParametric3d'),
+          surface: t('modeSurface')
+        };
+        var button = el('button', 'mini' + (mode.id === currentMode(slide).id ? ' on' : ''),
+          names[mode.id] || mode.label);
         button.addEventListener('click', function () {
           slide.mode = mode.id;
           slide.baseFrame = null;
           goTo(state.index, 0);
+          remember();
         });
         picker.appendChild(button);
       });
@@ -626,26 +713,21 @@
       card.appendChild(buildLegend(slide.plan.series));
     }
 
-    var figureHead = el('div', 'figure-head');
     var warn = el('span', 'warn', '');
     var zeroLabel = el('label', 'toggle');
     var zeroBox = document.createElement('input');
     zeroBox.type = 'checkbox';
     zeroBox.checked = slide.zeroCentered;
-    zeroLabel.title = 'Keep zero in the middle of both axes';
+    zeroLabel.title = t('zeroCenteredHint');
     zeroLabel.appendChild(zeroBox);
-    zeroLabel.appendChild(el('span', null, '0 centred'));
-    var refit = el('button', 'mini', 'Refit');
-    refit.title = 'Measure the vertical frame again from the current curve';
-    figureHead.appendChild(warn);
-    figureHead.appendChild(el('span', 'spacer'));
-    figureHead.appendChild(zeroLabel);
-    figureHead.appendChild(refit);
-    card.appendChild(figureHead);
+    zeroLabel.appendChild(el('span', null, t('zeroCentered')));
+    var refit = el('button', 'mini', t('refit'));
+    refit.title = t('refitHint');
 
     zeroBox.addEventListener('change', function () {
       slide.zeroCentered = zeroBox.checked;
       redraw();
+      remember();
     });
 
     var figure = el('div');
@@ -653,16 +735,24 @@
     var meta = el('div', 'meta');
     card.appendChild(meta);
 
+    // Below the plot, because both of these are about what was just drawn.
+    var figureFoot = el('div', 'figure-foot');
+    figureFoot.appendChild(refit);
+    figureFoot.appendChild(warn);
+    figureFoot.appendChild(el('span', 'spacer'));
+    figureFoot.appendChild(zeroLabel);
+    card.appendChild(figureFoot);
+
     function redraw() {
       var drawn = drawPlot(slide);
       figure.replaceChildren(drawn.svg);
-      warn.textContent = drawn.escapes ? 'curve leaves the frame' : '';
+      warn.textContent = drawn.escapes ? t('escapes') : '';
       if (drawn.readout) {
         meta.textContent = drawn.readout;
         return;
       }
       if (!drawn.geo) {
-        meta.textContent = 'nothing finite in this window';
+        meta.textContent = t('nothingHere');
         return;
       }
       meta.textContent = slide.plan.axis + ': '
@@ -676,6 +766,7 @@
       slide.baseFrame = null;
       slide.view.y = 0;
       goTo(state.index, 0);
+      remember();
     });
 
     function sliderRow(name, config, onInput) {
@@ -694,6 +785,7 @@
         readout.textContent = config.readout(value);
         onInput(value);
         redraw();
+        remember();
       });
       row.appendChild(input);
       row.appendChild(readout);
@@ -734,27 +826,26 @@
     };
 
     var mode = currentMode(slide);
-    var spanLabel = mode.id === 'series' ? slide.plan.axis + ' range' : slide.plan.axis + ' range';
-    axes.appendChild(sliderRow(spanLabel, zoomConfig(slide.view.x),
+    axes.appendChild(sliderRow(t('range', slide.plan.axis), zoomConfig(slide.view.x),
       function (value) { slide.view.x = value; }));
 
     if (mode.id === 'series') {
-      axes.appendChild(sliderRow('y range', zoomConfig(slide.view.y),
+      axes.appendChild(sliderRow(t('range', 'y'), zoomConfig(slide.view.y),
         function (value) { slide.view.y = value; }));
     } else if (mode.id === 'surface') {
-      axes.appendChild(sliderRow(mode.second + ' range', zoomConfig(slide.view.y),
+      axes.appendChild(sliderRow(t('range', mode.second), zoomConfig(slide.view.y),
         function (value) { slide.view.y = value; }));
     }
 
     if (mode.id !== 'series') {
-      axes.appendChild(sliderRow('zoom', zoomConfig(slide.view.zoom || 0),
+      axes.appendChild(sliderRow(t('zoom'), zoomConfig(slide.view.zoom || 0),
         function (value) { slide.view.zoom = value; }));
     }
 
     if (mode.id === 'surface' || mode.id === 'parametric3d') {
-      axes.appendChild(sliderRow('turn', angleConfig(slide.view.yaw),
+      axes.appendChild(sliderRow(t('turn'), angleConfig(slide.view.yaw),
         function (value) { slide.view.yaw = value; }));
-      axes.appendChild(sliderRow('tilt', angleConfig(slide.view.pitch),
+      axes.appendChild(sliderRow(t('tilt'), angleConfig(slide.view.pitch),
         function (value) { slide.view.pitch = value; }));
     }
     card.appendChild(axes);
@@ -776,6 +867,7 @@
         select.addEventListener('change', function () {
           slide.axesPick[position] = Number(select.value);
           redraw();
+          remember();
         });
         wrap.appendChild(select);
         pickRow.appendChild(wrap);
@@ -798,6 +890,7 @@
     state.nodes.next.disabled = state.index === state.slides.length - 1;
     state.nodes.progress.style.width =
       ((state.index + 1) / state.slides.length * 100).toFixed(1) + '%';
+    remember();
   }
 
   function move(step) {
@@ -835,8 +928,7 @@
 
   function buildSummary() {
     var box = el('details', 'summary');
-    var head = el('summary', null,
-      state.found + ' expressions found, ' + state.slides.length + ' plotted');
+    var head = el('summary', null, t('summary', state.found, state.slides.length));
     box.appendChild(head);
     var reasons = Object.keys(state.rejects).sort(function (a, b) {
       return state.rejects[b] - state.rejects[a];
@@ -855,10 +947,15 @@
     panel.tabIndex = -1;
 
     var head = el('div', 'head');
-    head.appendChild(el('div', 'title', 'Plot deck'));
+    head.appendChild(el('div', 'title', t('title')));
     state.nodes.count = el('div', 'count', '0 / 0');
     head.appendChild(state.nodes.count);
-    var close = el('button', null, 'Close');
+    var rescan = el('button', 'mini', t('rescan'));
+    rescan.addEventListener('click', function () {
+      forget(function () { open({ fresh: true }); });
+    });
+    head.appendChild(rescan);
+    var close = el('button', 'mini', t('close'));
     close.addEventListener('click', teardown);
     head.appendChild(close);
     panel.appendChild(head);
@@ -868,19 +965,17 @@
     panel.appendChild(stage);
 
     if (!state.slides.length) {
-      stage.appendChild(el('div', 'empty', state.found
-        ? 'Found math, but nothing on this page resolves to a curve.'
-        : 'No math markup found on this page.'));
+      stage.appendChild(el('div', 'empty', state.found ? t('nothingPlottable') : t('noMath')));
     } else {
       attachSwipe(stage);
     }
 
     var nav = el('div', 'nav');
     state.nodes.prev = el('button', null, '←');
-    state.nodes.prev.title = 'Previous slide';
+    state.nodes.prev.title = t('previous');
     state.nodes.prev.addEventListener('click', function () { move(-1); });
     state.nodes.next = el('button', null, '→');
-    state.nodes.next.title = 'Next slide';
+    state.nodes.next.title = t('next');
     state.nodes.next.addEventListener('click', function () { move(1); });
 
     var rail = el('div', 'rail');
@@ -889,7 +984,7 @@
     state.nodes.progress.style.width = '0%';
     rail.appendChild(state.nodes.progress);
 
-    var show = el('button', null, 'Show on page');
+    var show = el('button', null, t('showOnPage'));
     show.addEventListener('click', focusSource);
 
     nav.appendChild(state.nodes.prev);
@@ -969,7 +1064,7 @@
     });
   }
 
-  function open() {
+  function open(options) {
     teardown();
     scan();
     state.index = 0;
@@ -984,10 +1079,20 @@
     document.documentElement.appendChild(state.host);
     if (state.slides.length) goTo(0, 0);
     panel.focus({ preventScroll: true });
+
+    // A page opened again should come back the way it was left.
+    if (!(options && options.fresh)) {
+      recall(function (record) {
+        if (!record || !state.host) return;
+        var result = sessions.applyState(state.slides, record);
+        if (result.restored) goTo(result.index, 0);
+      });
+    }
     return report();
   }
 
   function teardown() {
+    remember(true);
     if (state.highlighted) {
       state.highlighted.style.outline = '';
       state.highlighted = null;
@@ -1023,7 +1128,7 @@
 
   chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     try {
-      if (message.type === 'plotdeck:open') sendResponse(open());
+      if (message.type === 'plotdeck:open') sendResponse(open(message.options));
       else if (message.type === 'plotdeck:close') sendResponse(teardown());
       else if (message.type === 'plotdeck:status') sendResponse(report());
     } catch (err) {
