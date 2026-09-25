@@ -1,6 +1,6 @@
 /**
  * Pulls LaTeX out of rendered math. Every path here is markup the renderer
- * already wrote, so extraction is exact rather than recognised.
+ * already wrote, so extraction is exact rather than recognized.
  *
  * MathJax v3 and v4 are the exception: they keep the TeX in their own data
  * structures rather than the DOM, so the content script reads those from the

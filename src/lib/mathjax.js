@@ -7,9 +7,9 @@
  * isolated content script can see them.
  *
  * `read` is therefore written to be handed to `chrome.scripting.executeScript`
- * with `world: "MAIN"`, which serialises the function and runs it in the page.
+ * with `world: "MAIN"`, which serializes the function and runs it in the page.
  * It must stay self contained: no closures, no references to anything outside
- * itself, or the serialised copy will fail once it lands.
+ * itself, or the serialized copy will fail once it lands.
  *
  * It cannot hand DOM nodes back across the boundary, so it leaves a marker
  * attribute on each rendered container and returns the sources alongside the

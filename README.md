@@ -21,7 +21,7 @@ Four stages, each of which can be checked on its own.
    lives in MathJax's own objects, in the page's world, where an isolated content
    script cannot reach it. A reader is therefore run in the page's world, which
    marks each rendered container and hands the sources back to be paired up again.
-   Nothing is recognised or guessed. Wikipedia publishes each formula
+   Nothing is recognized or guessed. Wikipedia publishes each formula
    twice, as MathML and as an image, so results are keyed on the expression itself.
    A stacked environment (`aligned`, `cases`, `gathered` and their relatives) holds
    one equation per line, so it is split into one unit per line. Matrix environments
