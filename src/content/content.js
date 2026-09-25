@@ -34,6 +34,7 @@
     found: 0,
     index: 0,
     highlighted: null,
+    mathjax: null,
     lastSwipe: 0,
     nodes: {}
   };
@@ -1072,7 +1073,9 @@
   }
 
   function scan() {
-    var items = extract.extract(document);
+    // Cached because a rescan happens inside the page, where there is no way to
+    // run anything in the page's own world again.
+    var items = extract.extract(document, state.mathjax);
     state.found = 0;
     state.slides = [];
     state.rejects = {};
@@ -1132,7 +1135,9 @@
   }
 
   function open(options) {
+    var carried = (options && options.mathjax) || state.mathjax;
     teardown();
+    state.mathjax = carried;
     scan();
     state.index = 0;
     state.host = document.createElement('div');

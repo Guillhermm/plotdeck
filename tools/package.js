@@ -184,6 +184,12 @@ function buildZip(files, read) {
 }
 
 function main() {
+  // Piping the listing into head closes stdout early; that is not a failure.
+  process.stdout.on('error', /** @param {NodeJS.ErrnoException} error */ function (error) {
+    if (error && error.code === 'EPIPE') return;
+    throw error;
+  });
+
   const outIndex = process.argv.indexOf('--out');
   const outDir = path.join(ROOT, outIndex === -1 ? 'dist' : process.argv[outIndex + 1]);
 

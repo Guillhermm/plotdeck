@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Plot deck",
   "version": "0.1.0",
-  "minimum_chrome_version": "93",
+  "minimum_chrome_version": "95",
   "description": "Finds every equation on a page and draws it, with a slider for each parameter. No model, no network.",
   "permissions": [
     "activeTab",

@@ -17,7 +17,11 @@ Four stages, each of which can be checked on its own.
 
 1. **Extract.** Rendered math already carries its own source: MathML `alttext`, the
    TeX `annotation` KaTeX writes, MathJax v2 script tags, and Wikipedia's fallback
-   image `alt`. Nothing is recognised or guessed. Wikipedia publishes each formula
+   image `alt`. From MathJax v3 the TeX is no longer in the document at all: it
+   lives in MathJax's own objects, in the page's world, where an isolated content
+   script cannot reach it. A reader is therefore run in the page's world, which
+   marks each rendered container and hands the sources back to be paired up again.
+   Nothing is recognised or guessed. Wikipedia publishes each formula
    twice, as MathML and as an image, so results are keyed on the expression itself.
    A stacked environment (`aligned`, `cases`, `gathered` and their relatives) holds
    one equation per line, so it is split into one unit per line. Matrix environments
@@ -219,9 +223,10 @@ skipped: `trivial-expression`, `implicit-relation`, `chained-relation`,
 
 ## Permissions and privacy
 
-`activeTab`, `scripting` and `storage`. `minimum_chrome_version` is 93: Manifest V3 and
-`chrome.scripting` put the working floor at 88, and `accent-color`, which tints every
-slider, arrives at 93. The themed scrollbars want 121 and fall back to the WebKit
+`activeTab`, `scripting` and `storage`. `minimum_chrome_version` is 95, which is where
+`chrome.scripting` learned to run a function in the page's own world. Below that come
+Manifest V3 and `chrome.scripting` themselves at 88, and `accent-color`, which tints
+every slider, at 93. The themed scrollbars want 121 and fall back to the WebKit
 pseudo-elements below that, so they do not gate anything.
 
 `PRIVACY.md` is the disclosure that goes with the listing, and `store/LISTING.md` holds
@@ -235,9 +240,9 @@ is sent anywhere: there is no network call in the extension at all.
 
 ## Known limits
 
-- MathJax v3 and v4 keep the TeX in their own objects rather than the DOM.
-  `extract.mathjaxSnippets` reads it, but wiring it up needs a `world: "MAIN"`
-  content script, which is not yet done.
+- A rescan from inside the drawer reuses the MathJax sources read when the deck was
+  opened, because nothing inside the page can run code in the page's own world again.
+  Reopening from the toolbar reads them afresh.
 - PDFs are not supported at all. Chrome's built-in viewer does not run content
   scripts, and PDF math carries no source to extract.
 - `parse-failed` is still the third largest reject bucket on Wikipedia. Those are
@@ -248,7 +253,7 @@ is sent anywhere: there is no network call in the extension at all.
 ## Development
 
 ```sh
-npm test          # 145 tests, node:test
+npm test          # 149 tests, node:test
 npm run typecheck # tsc over the JavaScript, no emit
 npm run package   # builds dist/plotdeck-<version>.zip for the store
 npm run icons     # regenerates src/images/*.png
@@ -300,6 +305,7 @@ disagree, which is the mistake that otherwise reaches the store unnoticed.
 - `src/lib/plan.js`: axis choice, sliders, domain, and every rejection reason.
 - `src/lib/plot.js`: sampling and SVG geometry, pure.
 - `src/lib/extract.js`: the DOM sources.
+- `src/lib/mathjax.js`: the reader that runs in the page's own world.
 - `src/lib/deck.js`: navigation arithmetic and the swipe verdict, pure.
 - `src/lib/view.js`: the axis windows, scaled about their center, pure.
 - `src/lib/space.js`: projection, normalization and depth ordering, pure.

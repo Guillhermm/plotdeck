@@ -17,6 +17,7 @@ interface Window {
   PlotDeckSession: typeof import('../src/lib/session.js');
   PlotDeckAutofit: typeof import('../src/lib/autofit.js');
   PlotDeckStrings: typeof import('../src/lib/strings.js');
+  PlotDeckMathJax: typeof import('../src/lib/mathjax.js');
 
   /** The drawer's own handle, used by the popup and by the test harnesses. */
   __plotdeck?: {
@@ -29,3 +30,10 @@ interface Window {
     state: any;
   };
 }
+
+/**
+ * The popup loads this one as a plain script, so it is a bare global there.
+ * `var` rather than `const`: only var and function declarations show up on
+ * globalThis, which is what the module's own assignment writes to.
+ */
+declare var PlotDeckMathJax: typeof import('../src/lib/mathjax.js');

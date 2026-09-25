@@ -73,15 +73,37 @@ function render(result) {
   }
 }
 
+/**
+ * Reads what MathJax kept to itself.
+ *
+ * From v3 the TeX lives in MathJax's own objects in the page's world, where an
+ * isolated content script cannot reach it. This runs the reader there instead.
+ * A page without MathJax, or one that refuses the injection, simply yields
+ * nothing and the ordinary extraction carries on.
+ */
+async function readMathJax(tabId) {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      func: PlotDeckMathJax.read
+    });
+    return (results && results[0] && results[0].result) || [];
+  } catch (err) {
+    return [];
+  }
+}
+
 async function onToggle() {
   const tab = await currentTab();
   if (restricted(tab)) return;
   els.toggle.disabled = true;
   try {
+    const mathjax = deckOpen ? [] : await readMathJax(tab.id);
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: FILES });
     const result = deckOpen
       ? await send(tab.id, { type: 'plotdeck:close' })
-      : await send(tab.id, { type: 'plotdeck:open' });
+      : await send(tab.id, { type: 'plotdeck:open', options: { mathjax } });
     if (!result) {
       els.status.textContent = 'The page did not respond. Reload it and try again.';
       return;

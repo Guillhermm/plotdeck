@@ -44,9 +44,12 @@
 
   /**
    * @param {ParentNode} scope
+   * @param {Array<{index: number, tex: string}>} [fromMathJax] sources read out
+   *   of MathJax's own objects by a script running in the page's world, paired
+   *   back up here through the marker attribute it left behind
    * @returns {Array<{tex: string, source: string, element: Element}>} in document order
    */
-  function extract(scope) {
+  function extract(scope, fromMathJax) {
     var host = scope || document;
     var found = [];
     var seen = new Set();
@@ -67,6 +70,17 @@
         seen.add(key);
         found.push({ tex: tex, source: source.name, element: anchor });
       }
+    });
+
+    (fromMathJax || []).forEach(function (entry) {
+      var tex = String((entry && entry.tex) || '').trim();
+      if (!tex) return;
+      var marked = host.querySelector('[data-plotdeck-mathjax="' + entry.index + '"]');
+      if (!marked) return;
+      var key = fingerprint(tex);
+      if (seen.has(key)) return;
+      seen.add(key);
+      found.push({ tex: tex, source: 'mathjax-runtime', element: marked });
     });
 
     found.sort(function (a, b) {
