@@ -129,13 +129,16 @@ domain of 0 to 10 over time, or 0.01 to 10 under a logarithm, touches zero only 
 edge, so it is left alone rather than spending half the picture where the function does
 not exist. Turning the toggle off fits each axis to the data instead.
 
-**Both windows follow the parameters, through the controls.** Move a parameter and
-the axis sliders move with it: the horizontal one to keep the part of the curve that
-actually does something, the vertical one to hold what the curve reaches inside that
-window. The fit is chosen as a slider position, never as a hidden frame, so the
-controls always describe what is on screen and any fit can be taken back by hand.
-Moving an axis slider yourself turns the fit off for that slide until a parameter
-moves again.
+**auto fit**, off by default and sitting beside **0 centered**, lets both windows
+follow the parameters through the controls. With it on, moving a parameter moves the
+axis sliders with it: the horizontal one to keep the part of the curve that actually
+does something, the vertical one to hold what the curve reaches inside that window.
+Turning it on fits once straight away, so the effect is visible immediately.
+
+The fit is chosen as a slider position, never as a hidden frame, so the controls
+always describe what is on screen and any fit can be taken back by hand. Moving an
+axis slider yourself suspends the fit for that slide until a parameter moves again.
+It is off by default because a window you set yourself should stay where you put it.
 
 Because the slider is geometric the fit lands on discrete steps, which is also what
 keeps a scale parameter visible: between two steps the curve grows inside a fixed

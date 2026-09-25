@@ -10,6 +10,7 @@ const slide = (tex, extra = {}) => Object.assign({
   values: { k: 1 },
   view: { x: 0, y: 0, zoom: 0, yaw: 35, pitch: 25 },
   zeroCentered: true,
+  autofit: false,
   axesPick: [0, 1, 2],
   baseFrame: { min: 0, max: 1 }
 }, extra);
@@ -26,7 +27,9 @@ test('a slide is identified by its own expression', () => {
 });
 
 test('capture and apply make a round trip', () => {
-  const before = [slide('y=kx', { mode: 'surface', values: { k: 2.5 }, zeroCentered: false })];
+  const before = [slide('y=kx', {
+    mode: 'surface', values: { k: 2.5 }, zeroCentered: false, autofit: true
+  })];
   const state = session.captureState(before, 0);
 
   const after = [slide('y=kx')];
@@ -35,6 +38,7 @@ test('capture and apply make a round trip', () => {
   assert.equal(after[0].mode, 'surface');
   assert.equal(after[0].values.k, 2.5);
   assert.equal(after[0].zeroCentered, false);
+  assert.equal(after[0].autofit, true, 'the toggles come back too');
 });
 
 test('the remembered slide is found again after a rescan reorders the page', () => {

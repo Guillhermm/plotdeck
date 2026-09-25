@@ -34,6 +34,7 @@
           values: Object.assign({}, slide.values),
           view: Object.assign({}, slide.view),
           zeroCentered: slide.zeroCentered,
+          autofit: slide.autofit,
           axesPick: slide.axesPick ? slide.axesPick.slice() : undefined
         };
       })
@@ -62,6 +63,7 @@
       restored += 1;
       if (saved.mode) slide.mode = saved.mode;
       if (saved.zeroCentered !== undefined) slide.zeroCentered = saved.zeroCentered;
+      if (saved.autofit !== undefined) slide.autofit = saved.autofit;
       if (saved.axesPick) slide.axesPick = saved.axesPick.slice();
       if (saved.view) slide.view = Object.assign({}, slide.view, saved.view);
       if (saved.values) {

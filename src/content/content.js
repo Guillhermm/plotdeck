@@ -746,21 +746,33 @@
     }
 
     var warn = el('span', 'warn', '');
-    var zeroLabel = el('label', 'toggle');
-    var zeroBox = document.createElement('input');
-    zeroBox.type = 'checkbox';
-    zeroBox.checked = slide.zeroCentered;
-    zeroLabel.title = t('zeroCenteredHint');
-    zeroLabel.appendChild(zeroBox);
-    zeroLabel.appendChild(el('span', null, t('zeroCentered')));
-    var refit = el('button', 'mini', t('refit'));
-    refit.title = t('refitHint');
+    var toggle = function (checked, label, hint, onChange) {
+      var wrap = el('label', 'toggle');
+      var box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = checked;
+      wrap.title = hint;
+      wrap.appendChild(box);
+      wrap.appendChild(el('span', null, label));
+      box.addEventListener('change', function () { onChange(box.checked); });
+      return wrap;
+    };
 
-    zeroBox.addEventListener('change', function () {
-      slide.zeroCentered = zeroBox.checked;
+    var fitLabel = toggle(slide.autofit, t('autoFit'), t('autoFitHint'), function (checked) {
+      slide.autofit = checked;
+      // Turning it on should show what it does straight away.
+      if (checked) slide.fitNext = true;
       redraw();
       remember();
     });
+    var zeroLabel = toggle(slide.zeroCentered, t('zeroCentered'), t('zeroCenteredHint'),
+      function (checked) {
+        slide.zeroCentered = checked;
+        redraw();
+        remember();
+      });
+    var refit = el('button', 'mini', t('refit'));
+    refit.title = t('refitHint');
 
     var figure = el('div');
     card.appendChild(figure);
@@ -772,11 +784,12 @@
     figureFoot.appendChild(refit);
     figureFoot.appendChild(warn);
     figureFoot.appendChild(el('span', 'spacer'));
+    figureFoot.appendChild(fitLabel);
     figureFoot.appendChild(zeroLabel);
     card.appendChild(figureFoot);
 
     function redraw() {
-      if (slide.fitNext && currentMode(slide).id === 'series') {
+      if (slide.autofit && slide.fitNext && currentMode(slide).id === 'series') {
         fitWindows(slide);
         slide.fitNext = false;
         xControl.set(slide.view.x);
@@ -1077,6 +1090,7 @@
         baseDomain: { min: plan.domain.min, max: plan.domain.max },
         baseFrame: null,
         zeroCentered: true,
+        autofit: false,
         mode: 'series',
         axesPick: [0, 1, 2],
         view: { x: 0, y: 0, zoom: 0, yaw: 35, pitch: 25 }
