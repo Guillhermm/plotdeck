@@ -74,7 +74,7 @@
    * The part of the horizontal window where the curve actually does something.
    *
    * Sampled over the widest window the slider allows, this is the smallest
-   * window about the centre holding most of the total variation, which is what
+   * window about the center holding most of the total variation, which is what
    * keeps a transition on screen when a parameter makes it narrow or wide.
    */
   function variationWindow(samples, center, fraction) {

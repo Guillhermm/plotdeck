@@ -347,7 +347,7 @@
     return { svg: svg, geo: reference, escapes: escapes };
   }
 
-  /** Blends two hex colours, for shading a mesh by height. */
+  /** Blends two hex colors, for shading a mesh by height. */
   function blend(from, to, amount) {
     var parse = function (hex) {
       return [1, 3, 5].map(function (offset) { return parseInt(hex.substr(offset, 2), 16); });

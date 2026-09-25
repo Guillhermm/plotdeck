@@ -1,8 +1,8 @@
 /**
- * The window on each axis: a centre that does not move and a span the viewer
- * controls. Pure, so the zoom behaviour can be tested without a browser.
+ * The window on each axis: a center that does not move and a span the viewer
+ * controls. Pure, so the zoom behavior can be tested without a browser.
  *
- * A span control rather than a pair of bounds means the curve stays centred by
+ * A span control rather than a pair of bounds means the curve stays centered by
  * construction, and one slider covers four orders of magnitude, which typing
  * bounds cannot do comfortably.
  */
@@ -31,7 +31,7 @@
     return Math.round(Math.log(factor) / Math.LN10 * PER_DECADE);
   }
 
-  /** Scales a range about its own centre, so the middle stays put. */
+  /** Scales a range about its own center, so the middle stays put. */
   function zoom(range, factor) {
     if (!range) return null;
     var middle = center(range);

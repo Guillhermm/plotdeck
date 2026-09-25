@@ -146,7 +146,7 @@ test('grid samples a function of two variables', () => {
   const mesh = plot.grid(ast, 'x', 'y', { min: -2, max: 2 }, { min: -2, max: 2 }, {}, 5);
   assert.equal(mesh.a.length, 5);
   assert.equal(mesh.z.length, 5);
-  assert.equal(mesh.z[2][2], 0, 'the centre of the paraboloid');
+  assert.equal(mesh.z[2][2], 0, 'the center of the paraboloid');
   assert.equal(mesh.z[0][0], 8, 'the far corner');
   assert.equal(mesh.z[0][4], 8, 'and the opposite one');
 });

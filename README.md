@@ -114,8 +114,8 @@ Wikipedia article for the logistic function, 11 of the 23 slides carry no parame
 at all.
 
 Every slide, with parameters or without, gets a span control for each axis: **x range**
-and **y range**. Each one scales its window about the window's own centre, so the
-centre never moves and the curve cannot drift off to a corner the way a pair of typed
+and **y range**. Each one scales its window about the window's own center, so the
+center never moves and the curve cannot drift off to a corner the way a pair of typed
 bounds allows. One step is a constant ratio and the ends are 0.01x and 100x the
 measured span, which is four orders of magnitude on a control that typing two numbers
 cannot cover comfortably. The readout is the factor, and the line under the plot gives
@@ -123,8 +123,8 @@ the resulting bounds on both axes.
 
 **0 centered**, on by default and sitting below the plot beside **Refit**, puts zero
 in the middle of both axes rather than the middle of the data. So the logistic function, whose curve runs 0 to 1, gets a vertical
-window of -1.08 to 1.08 with the zero line across the centre, and zooming keeps it
-there. The test is strict: a window only gets recentred when zero lies *inside* it. A
+window of -1.08 to 1.08 with the zero line across the center, and zooming keeps it
+there. The test is strict: a window only gets recentered when zero lies *inside* it. A
 domain of 0 to 10 over time, or 0.01 to 10 under a logarithm, touches zero only at its
 edge, so it is left alone rather than spending half the picture where the function does
 not exist. Turning the toggle off fits each axis to the data instead.
@@ -144,7 +144,7 @@ Because the slider is geometric the fit lands on discrete steps, which is also w
 keeps a scale parameter visible: between two steps the curve grows inside a fixed
 frame, and only when it no longer fits does the step, and the control, move.
 
-The horizontal fit takes the smallest window about the centre holding 92% of the
+The horizontal fit takes the smallest window about the center holding 92% of the
 curve's total variation, which is what keeps a transition on screen when a parameter
 makes it narrow or wide. It may not open the window more than about 4x past what the
 planner chose: a curve that grows without bound puts nearly all of its variation at
@@ -174,55 +174,6 @@ towards the answer over several adjustments, and fitting with headroom to spare.
 cost visibility on every page tried.
 
 **Refit** pulls the vertical frame back to the current curve.
-
-## A slide
-
-The formula is shown as the page rendered it, copied out of the document, and
-clicking it copies the LaTeX. Under it come the curves, then the controls. A slide
-built from several lines carries a legend naming each curve.
-
-## Controls on a slide
-
-A slide only gets parameter sliders when the equation has parameters, so
-`f(x)=1/(1+e^{-x})` has none and `f(x)=L/(1+e^{-k(x-x_0)})` has three. On the
-Wikipedia article for the logistic function, 11 of the 23 slides carry no parameters
-at all.
-
-Every slide, with parameters or without, gets a span control for each axis: **x range**
-and **y range**. Each one scales its window about the window's own centre, so the
-centre never moves and the curve cannot drift off to a corner the way a pair of typed
-bounds allows. One step is a constant ratio and the ends are 0.01x and 100x the
-measured span, which is four orders of magnitude on a control that typing two numbers
-cannot cover comfortably. The readout is the factor, and the line under the plot gives
-the resulting bounds on both axes.
-
-**0 centered**, on by default and sitting below the plot beside **Refit**, puts zero
-in the middle of both axes rather than the middle of the data. So the logistic function, whose curve runs 0 to 1, gets a vertical
-window of -1.08 to 1.08 with the zero line across the centre, and zooming keeps it
-there. The test is strict: a window only gets recentred when zero lies *inside* it. A
-domain of 0 to 10 over time, or 0.01 to 10 under a logarithm, touches zero only at its
-edge, so it is left alone rather than spending half the picture where the function does
-not exist. Turning the toggle off fits each axis to the data instead.
-
-**The vertical frame also grows on its own.** Holding it still is what makes a scale
-parameter visible, but held too literally it would let a curve climb out of sight. So
-the frame never shrinks by itself and never rescales in step with the data, but when
-the curve does outgrow it the frame expands to hold it with room to spare. The
-headroom is the point: fitting exactly would put the curve against the edge after
-every adjustment, and growth would read as a series of jumps rather than as growth.
-**Refit** pulls the frame back to the current curve.
-
-**The vertical frame is measured once per slide and then held.** This matters more
-than it sounds. If the axis is refitted on every redraw, a scale parameter stretches
-the data and the axis by exactly the same factor, so the curve is redrawn pixel for
-pixel identical and the slider appears dead. On that same page, 12 of the 16 sliders
-were affected: every one changed the numbers, only 4 changed the picture. With the
-frame held, all 16 change the picture.
-
-When a curve grows past the held frame it is clipped at the edge, the slide says
-"curve leaves the frame", and **Refit** measures the frame again from the current
-curve and returns the y range to 1x. Tick labels on
-both axes make the size of the change readable rather than implied.
 
 ## Measured yield
 
@@ -341,8 +292,8 @@ disagree, which is the mistake that otherwise reaches the store unnoticed.
 - `src/lib/plot.js`: sampling and SVG geometry, pure.
 - `src/lib/extract.js`: the DOM sources.
 - `src/lib/deck.js`: navigation arithmetic and the swipe verdict, pure.
-- `src/lib/view.js`: the axis windows, scaled about their centre, pure.
-- `src/lib/space.js`: projection, normalisation and depth ordering, pure.
+- `src/lib/view.js`: the axis windows, scaled about their center, pure.
+- `src/lib/space.js`: projection, normalization and depth ordering, pure.
 - `src/lib/strings.js`: the drawer's words, per language, pure.
 - `src/lib/session.js`: what to remember about a page and how to put it back, pure.
 - `src/lib/autofit.js`: where the axis controls should sit, pure.

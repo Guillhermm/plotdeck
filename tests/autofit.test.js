@@ -66,7 +66,7 @@ test('the variation window closes in on where a curve actually moves', () => {
   const window = autofit.variationWindow(samples, 0);
   assert.ok(window.max < 10, `expected a tight window, got ${window.max}`);
   assert.ok(window.max > 0.4);
-  assert.equal((window.min + window.max) / 2, 0, 'and it stays centred');
+  assert.equal((window.min + window.max) / 2, 0, 'and it stays centered');
 });
 
 test('a steeper transition gives a tighter window', () => {

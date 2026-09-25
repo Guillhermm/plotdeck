@@ -4,14 +4,14 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const view = require('../src/lib/view.js');
 
-test('the centre does not move when the span changes', () => {
+test('the center does not move when the span changes', () => {
   const base = { min: -10, max: 10 };
   for (const factor of [0.01, 0.5, 1, 2, 100]) {
     assert.equal(view.center(view.zoom(base, factor)), 0, `factor ${factor}`);
   }
 });
 
-test('an off-centre range keeps its own centre', () => {
+test('an off-center range keeps its own center', () => {
   const base = { min: 0, max: 10 };
   const zoomed = view.zoom(base, 0.5);
   assert.equal(view.center(zoomed), 5);
@@ -86,7 +86,7 @@ test('zero centring survives a range that is entirely tiny', () => {
   assert.ok(framed.max > framed.min);
 });
 
-test('zooming a zero centred window keeps zero in the middle', () => {
+test('zooming a zero centered window keeps zero in the middle', () => {
   const framed = view.frameFor({ min: -0.08, max: 1.08 }, true);
   for (const position of [-8, 0, 5, 20]) {
     assert.equal(view.center(view.zoom(framed, view.factorFor(position))), 0);
