@@ -217,7 +217,16 @@ skipped: `trivial-expression`, `implicit-relation`, `chained-relation`,
   it is the imaginary unit and the expression is refused, while standing alone, as in
   the interest rate of `P(1+i)^n`, it is an ordinary real variable and still plots.
 
-## Permissions
+## Permissions and privacy
+
+`activeTab`, `scripting` and `storage`. `minimum_chrome_version` is 93: Manifest V3 and
+`chrome.scripting` put the working floor at 88, and `accent-color`, which tints every
+slider, arrives at 93. The themed scrollbars want 121 and fall back to the WebKit
+pseudo-elements below that, so they do not gate anything.
+
+`PRIVACY.md` is the disclosure that goes with the listing, and `store/LISTING.md` holds
+the submission text: descriptions, the single-purpose statement, a justification for
+each permission, and the data-usage answers. Neither is packaged.
 
 `activeTab`, `scripting` and `storage`. There is no host permission and no content
 script registered in the manifest, so nothing runs anywhere until the toolbar icon is
