@@ -18,6 +18,7 @@ interface Window {
   PlotDeckAutofit: typeof import('../src/lib/autofit.js');
   PlotDeckStrings: typeof import('../src/lib/strings.js');
   PlotDeckMathJax: typeof import('../src/lib/mathjax.js');
+  PlotDeckExport: typeof import('../src/lib/export.js');
 
   /** The drawer's own handle, used by the popup and by the test harnesses. */
   __plotdeck?: {
@@ -37,3 +38,5 @@ interface Window {
  * globalThis, which is what the module's own assignment writes to.
  */
 declare var PlotDeckMathJax: typeof import('../src/lib/mathjax.js');
+
+declare var PlotDeckArxiv: typeof import('../src/lib/arxiv.js');

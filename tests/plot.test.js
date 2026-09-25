@@ -158,6 +158,27 @@ test('grid keeps what is not finite rather than guessing', () => {
   assert.ok(!Number.isFinite(mesh.z[1][0]), 'the pole at x = 0 stays a hole');
 });
 
+test('starting values leave the curve with something to show', () => {
+  const { plan } = require('../src/lib/plan.js');
+  // b to the x is the constant one when b is one, so one is not the answer here
+  const power = plan('f(x)=b^{x}').plan;
+  const values = plot.livelyValues(power);
+  const ys = plot.sample(power, values, 32).map((p) => p.y).filter(Number.isFinite);
+  assert.ok(Math.max(...ys) - Math.min(...ys) > 1e-9, 'the curve must not be flat');
+});
+
+test('one stays the default when one already works', () => {
+  const { plan } = require('../src/lib/plan.js');
+  assert.deepEqual(plot.livelyValues(plan('y=kx').plan), { k: 1 });
+  assert.deepEqual(plot.livelyValues(plan('y=x^2').plan), {});
+});
+
+test('a curve nothing can enliven keeps the plain default', () => {
+  const { plan } = require('../src/lib/plan.js');
+  const flat = plan('y=a-a+x').plan;
+  assert.deepEqual(Object.keys(plot.livelyValues(flat)), ['a']);
+});
+
 test('format keeps numbers short', () => {
   assert.equal(plot.format(3.14159), '3.142');
   assert.equal(plot.format(120000), '1.2e+5');

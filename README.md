@@ -80,6 +80,12 @@ page with a hundred equations costs the same as a page with one.
 - Both ends clamp rather than wrap, and the buttons disable there.
 - Slider positions belong to the slide, so they survive leaving and coming back.
 - "Show on page" scrolls the page to the equation and outlines it.
+- **Save PNG** writes the plot to a file. The drawing is already an SVG this
+  extension wrote, so nothing is captured: it is serialized, painted onto a canvas
+  at twice the size and offered through an ordinary link, with no download
+  permission and nothing of the page included. The name carries where it came
+  from, what it draws and when, as in
+  `en-wikipedia-org-wiki-logistic-function_f-x-vs-x_20260924-231500.png`.
 
 ## Language
 
@@ -203,6 +209,37 @@ The drawer reports the same breakdown live, so a page always accounts for what i
 skipped: `trivial-expression`, `implicit-relation`, `chained-relation`,
 `unsupported-integral`, `asymptotic-notation` and so on.
 
+## How much of the deck is worth looking at
+
+Counting slides says nothing about whether they are worth swiping through, so the
+slides from five articles were dumped and read, with each curve classified by whether
+it was flat, straight or actually curved.
+
+| | Slides | Curved | Straight | Constant |
+|---|---|---|---|---|
+| Before | 133 | 78 | 45 | 10 |
+| After | 115 | 85 | 29 | 1 |
+
+Reading them turned a vague worry about noise into two specific faults.
+
+**A function reference is not a product.** `P(t)` names a function at t. Read as an
+expression it became P times t, and drew a straight line through a formula that was
+never there. Nine slides across five articles were this. An expression that is exactly
+one symbol applied to one other symbol is now refused as `function-reference`, while a
+compound argument, as in `k(x-x_0)`, really is multiplication and still plots.
+
+**One is the identity.** Every parameter started at one, and `b^x` with b at one is the
+constant one; a logistic growth curve is flat whenever K equals P_0, at any value. Real
+functions were arriving as flat lines because of their starting values, not their
+mathematics. Parameters now start at values that leave the curve with something to
+show, trying one first and spreading the values apart when a formula collapses wherever
+two of its parameters agree.
+
+Together those took the share of slides with nothing to see from 41% to 26%, and the
+number of flat ones from ten to one. What remains straight is mostly genuine: `x=v_x t`
+really is a line, and so are fragments like `\mu - n\sigma` that the bare-expression
+mode picks up.
+
 ## What it deliberately refuses
 
 - Integrals, sums, products, limits, derivatives, matrices and vectors.
@@ -244,7 +281,11 @@ is sent anywhere: there is no network call in the extension at all.
   opened, because nothing inside the page can run code in the page's own world again.
   Reopening from the toolbar reads them afresh.
 - PDFs are not supported at all. Chrome's built-in viewer does not run content
-  scripts, and PDF math carries no source to extract.
+  scripts, and PDF math carries no source to extract. This is not a gap to be closed
+  later: reading it would need optical recognition, which means a model, which is the
+  one thing this extension is built without. For arXiv there is a way round, and the
+  popup offers it: every LaTeX submission since 2023 has an HTML rendering that does
+  carry its source, so opening a paper's PDF offers a link to that instead.
 - `parse-failed` is still the third largest reject bucket on Wikipedia. Those are
   real notation the subset does not cover yet, not crashes.
 - The axis is a convention, not an understanding. `E=mc^2` plots `E` against `m`
@@ -253,7 +294,7 @@ is sent anywhere: there is no network call in the extension at all.
 ## Development
 
 ```sh
-npm test          # 149 tests, node:test
+npm test          # 166 tests, node:test
 npm run typecheck # tsc over the JavaScript, no emit
 npm run package   # builds dist/plotdeck-<version>.zip for the store
 npm run icons     # regenerates src/images/*.png
@@ -306,6 +347,8 @@ disagree, which is the mistake that otherwise reaches the store unnoticed.
 - `src/lib/plot.js`: sampling and SVG geometry, pure.
 - `src/lib/extract.js`: the DOM sources.
 - `src/lib/mathjax.js`: the reader that runs in the page's own world.
+- `src/lib/arxiv.js`: a paper's PDF address to its HTML one, pure.
+- `src/lib/export.js`: the plot to a PNG, and what to call the file.
 - `src/lib/deck.js`: navigation arithmetic and the swipe verdict, pure.
 - `src/lib/view.js`: the axis windows, scaled about their center, pure.
 - `src/lib/space.js`: projection, normalization and depth ordering, pure.

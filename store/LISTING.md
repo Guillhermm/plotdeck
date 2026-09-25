@@ -39,7 +39,7 @@ growth rate and midpoint ready to move, and the curve responds as you move them.
 - Systems of equations sharing a parameter are drawn together on one pair of axes
 - Two equations in one parameter can be read as a parametric curve, three as a curve in
   space, and an equation in two variables as a wireframe surface you can turn and tilt
-- Click a formula to copy its LaTeX
+- Click a formula to copy its LaTeX, or save any plot as a PNG
 - "Show on page" scrolls back to where the equation came from
 - Reopening a page you have read before returns you to the slide you left
 
@@ -58,7 +58,7 @@ with it, on your own machine.
 
 Known limits, stated plainly: equations rendered as images cannot be read, because there
 is no notation to read; PDFs are not supported, because Chrome's PDF viewer runs no
-extension code; and implicit relations, integrals, sums, matrices and complex-valued
+extension code, though opening an arXiv paper's PDF offers its HTML version instead; and implicit relations, integrals, sums, matrices and complex-valued
 expressions are refused rather than drawn wrongly.
 
 ## Permission justifications

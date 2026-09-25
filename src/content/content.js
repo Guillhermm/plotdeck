@@ -24,6 +24,7 @@
   var space = window.PlotDeckSpace;
   var sessions = window.PlotDeckSession;
   var autofit = window.PlotDeckAutofit;
+  var exporter = window.PlotDeckExport;
   var t = window.PlotDeckStrings.translator(window.PlotDeckStrings.pageLocale(document));
 
   var state = {
@@ -774,6 +775,22 @@
       });
     var refit = el('button', 'mini', t('refit'));
     refit.title = t('refitHint');
+    var savePng = el('button', 'mini', t('savePng'));
+    savePng.title = t('savePngHint');
+
+    savePng.addEventListener('click', function () {
+      var drawing = figure.querySelector('svg');
+      if (!drawing) return;
+      savePng.disabled = true;
+      exporter.toPng(drawing, '#0d1117').then(function (blob) {
+        exporter.save(blob, exporter.downloadName(
+          location.href, slide.plan.label, slide.plan.axis));
+        savePng.disabled = false;
+      }, function () {
+        warn.textContent = t('saveFailed');
+        savePng.disabled = false;
+      });
+    });
 
     var figure = el('div');
     card.appendChild(figure);
@@ -783,6 +800,7 @@
     // Below the plot, because both of these are about what was just drawn.
     var figureFoot = el('div', 'figure-foot');
     figureFoot.appendChild(refit);
+    figureFoot.appendChild(savePng);
     figureFoot.appendChild(warn);
     figureFoot.appendChild(el('span', 'spacer'));
     figureFoot.appendChild(fitLabel);
@@ -1082,8 +1100,10 @@
 
     function addSlide(tex, item, plan) {
       if (state.slides.length >= MAX_SLIDES) return;
-      var values = {};
-      plan.sliders.forEach(function (slider) { values[slider.name] = slider.value; });
+      var values = plotter.livelyValues(plan);
+      plan.sliders.forEach(function (slider) {
+        if (values[slider.name] === undefined) values[slider.name] = slider.value;
+      });
       state.slides.push({
         tex: tex,
         element: item.element,

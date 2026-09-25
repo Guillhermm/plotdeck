@@ -181,6 +181,13 @@
     };
   }
 
+  /** True for a tree that is exactly one symbol applied to one other symbol. */
+  function isFunctionReference(node) {
+    return !!node && node.type === 'mul'
+      && !!node.left && node.left.type === 'sym'
+      && !!node.right && node.right.type === 'sym';
+  }
+
   function nodeCount(node) {
     if (!node || typeof node !== 'object') return 0;
     return 1 + ['left', 'right', 'arg'].reduce(function (total, key) {
@@ -200,6 +207,10 @@
       return { ok: false, reason: err.reason || 'parse-failed', detail: err.message };
     }
     if (nodeCount(ast) < 3) return { ok: false, reason: 'trivial-expression' };
+    // P(t) names a function at t. Read as an expression it becomes P times t,
+    // which draws a straight line through a formula that was never there. A
+    // compound argument, as in k(x-x_0), really is multiplication and stays.
+    if (isFunctionReference(ast)) return { ok: false, reason: 'function-reference' };
     if (evaluate.usesImaginaryUnit(ast)) return { ok: false, reason: 'complex-valued' };
 
     var symbols = evaluate.freeSymbols(ast);
@@ -339,6 +350,7 @@
 
   var api = {
     plan: plan,
+    isFunctionReference: isFunctionReference,
     modesFor: modesFor,
     planExpression: planExpression,
     groupPlans: groupPlans,

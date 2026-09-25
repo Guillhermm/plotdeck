@@ -8,12 +8,14 @@
   <body>
     <h1>Plot deck</h1>
     <p id="status">Checking page…</p>
+    <p id="hint" hidden></p>
     <button id="toggle" type="button">Scan this page</button>
     <dl id="stats" hidden>
       <div><dt>Expressions found</dt><dd id="stat-found">0</dd></div>
       <div><dt>Plotted</dt><dd id="stat-plotted">0</dd></div>
     </dl>
     <div id="rejects"></div>
+    <script src="../lib/arxiv.js"></script>
     <script src="../lib/mathjax.js"></script>
     <script src="popup.js"></script>
   </body>

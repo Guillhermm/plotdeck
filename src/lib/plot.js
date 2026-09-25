@@ -226,8 +226,49 @@
     return String(Math.round(value * 1000) / 1000);
   }
 
+  /**
+   * Starting values for the parameters that leave the curve with something to
+   * show.
+   *
+   * One is the natural default and the usual right answer, but it is also the
+   * identity: b^x with b at one is the constant one, and a logistic curve with
+   * every parameter at one is flat. Rather than accept a straight line, try the
+   * next candidate until the curve bends.
+   *
+   * @param {{axis: string, ast: Object, domain: {min: number, max: number},
+   *   sliders: Array<{name: string}>}} plan
+   * @param {Array<Array<number>>} [patterns] value patterns to try, in order
+   * @returns {Object<string, number>}
+   */
+  function livelyValues(plan, patterns) {
+    // One value each in turn, then spreads, because some formulas collapse
+    // whenever two of their parameters agree: the logistic growth curve is
+    // constant for every K equal to P_0, whatever that value is.
+    var attempts = patterns || [[1], [2], [2, 3, 0.5, 4], [0.5, 2, 4, 3], [3, 0.5, 2, 5]];
+    var chosen = null;
+    for (var i = 0; i < attempts.length; i += 1) {
+      var pattern = attempts[i];
+      var values = {};
+      plan.sliders.forEach(function (slider, position) {
+        values[slider.name] = pattern[position % pattern.length];
+      });
+      if (!chosen) chosen = values;
+      // The raw spread, not verticalRange, which pads a flat curve into a band
+      // and would report every constant as having something to show.
+      var ys = sample(plan, values, 48)
+        .map(function (point) { return point.y; })
+        .filter(function (y) { return Number.isFinite(y); });
+      if (!ys.length) continue;
+      var low = Math.min.apply(null, ys);
+      var high = Math.max.apply(null, ys);
+      if (high - low > Math.max(1e-12, Math.abs(low) * 1e-9)) return values;
+    }
+    return chosen || {};
+  }
+
   var api = {
     sample: sample,
+    livelyValues: livelyValues,
     grid: grid,
     verticalRange: verticalRange,
     coreRange: coreRange,

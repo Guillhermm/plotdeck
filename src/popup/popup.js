@@ -12,11 +12,13 @@ const FILES = [
   'src/lib/strings.js',
   'src/lib/session.js',
   'src/lib/autofit.js',
+  'src/lib/export.js',
   'src/content/content.js'
 ];
 
 const els = {
   status: document.getElementById('status'),
+  hint: document.getElementById('hint'),
   toggle: /** @type {HTMLButtonElement} */ (document.getElementById('toggle')),
   stats: document.getElementById('stats'),
   found: document.getElementById('stat-found'),
@@ -128,6 +130,24 @@ async function seenBefore(url) {
   return !!(plotdeck && plotdeck[withoutHash]);
 }
 
+/**
+ * A PDF cannot be read, but an arXiv paper has an HTML rendering that can be.
+ * Offered as a link rather than a redirect: the reader keeps the tab they are on.
+ */
+function offerArxivHtml(url) {
+  const html = PlotDeckArxiv.htmlUrl(url);
+  if (!html) return;
+  els.hint.replaceChildren();
+  els.hint.append('Equations cannot be read from a PDF. arXiv publishes an HTML version of this paper: ');
+  const link = document.createElement('a');
+  link.href = html;
+  link.target = '_blank';
+  link.rel = 'noreferrer';
+  link.textContent = 'open it';
+  els.hint.append(link, '.');
+  els.hint.hidden = false;
+}
+
 async function init() {
   const tab = await currentTab();
   if (restricted(tab)) {
@@ -136,6 +156,7 @@ async function init() {
     return;
   }
   els.toggle.addEventListener('click', onToggle);
+  offerArxivHtml(tab.url);
 
   const status = await send(tab.id, { type: 'plotdeck:status' });
   render(status);
