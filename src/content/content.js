@@ -23,6 +23,7 @@
   var viewer = window.PlotDeckView;
   var space = window.PlotDeckSpace;
   var sessions = window.PlotDeckSession;
+  var autofit = window.PlotDeckAutofit;
   var t = window.PlotDeckStrings.translator(window.PlotDeckStrings.pageLocale(document));
 
   var state = {
@@ -248,14 +249,9 @@
       );
     });
 
-    // The frame is measured once and then held, so moving a scale parameter
-    // moves the curve instead of silently rescaling the axis. It does grow when
-    // the curve outgrows it, with headroom, so a parameter can be pushed a long
-    // way without the curve disappearing off the top.
-    var natural = plotter.combinedRange(pointsList);
-    slide.baseFrame = slide.baseFrame
-      ? viewer.expandToHold(slide.baseFrame, natural)
-      : natural;
+    // The frame is the first measurement scaled by the slider, and nothing
+    // else. Anything that moves the view moves the control with it.
+    if (!slide.baseFrame) slide.baseFrame = plotter.combinedRange(pointsList);
     var frame = slide.baseFrame
       ? viewer.zoom(
         viewer.frameFor(slide.baseFrame, slide.zeroCentered),
@@ -667,6 +663,42 @@
     return legend;
   }
 
+  /**
+   * Moves the axis controls so the curve stays framed after a parameter change.
+   *
+   * Horizontal first, because the window on the parameter decides what the
+   * curve reaches, and only then vertical. Both are chosen as slider positions
+   * rather than as frames, so the controls keep describing what is on screen.
+   */
+  function fitWindows(slide) {
+    var anchorDomain = viewer.frameFor(slide.baseDomain, slide.zeroCentered);
+    var shoot = function (item, domain) {
+      return plotter.sample(
+        { axis: slide.plan.axis, ast: item.ast, domain: domain }, slide.values
+      );
+    };
+
+    var widest = viewer.zoom(anchorDomain, viewer.factorFor(viewer.STEPS));
+    var middle = viewer.center(anchorDomain);
+    var wanted = null;
+    slide.plan.series.forEach(function (item) {
+      var found = autofit.variationWindow(shoot(item, widest), middle);
+      if (!found) return;
+      if (!wanted || viewer.span(found) > viewer.span(wanted)) wanted = found;
+    });
+    slide.view.x = autofit.chooseStep(anchorDomain, wanted, slide.view.x,
+      { maxStep: autofit.MAX_WIDEN });
+
+    var domain = viewer.zoom(anchorDomain, viewer.factorFor(slide.view.x));
+    var pointsList = slide.plan.series.map(function (item) { return shoot(item, domain); });
+    if (!slide.baseFrame) slide.baseFrame = plotter.combinedRange(pointsList);
+    slide.view.y = autofit.chooseStep(
+      viewer.frameFor(slide.baseFrame, slide.zeroCentered),
+      plotter.combinedRange(pointsList),
+      slide.view.y
+    );
+  }
+
   function buildCard(slide) {
     var card = el('div', 'card');
     var kindLabel = slide.plan.kind === 'expression' ? t('expression')
@@ -744,6 +776,12 @@
     card.appendChild(figureFoot);
 
     function redraw() {
+      if (slide.fitNext && currentMode(slide).id === 'series') {
+        fitWindows(slide);
+        slide.fitNext = false;
+        xControl.set(slide.view.x);
+        if (yControl) yControl.set(slide.view.y);
+      }
       var drawn = drawPlot(slide);
       figure.replaceChildren(drawn.svg);
       warn.textContent = drawn.escapes ? t('escapes') : '';
@@ -769,6 +807,10 @@
       remember();
     });
 
+    /**
+     * @returns {{row: Element, set: function(number): void}} so a control can be
+     *   moved by the fit as well as by hand, and still read correctly.
+     */
     function sliderRow(name, config, onInput) {
       var row = el('div', 'slider');
       row.appendChild(el('span', null, name));
@@ -789,7 +831,13 @@
       });
       row.appendChild(input);
       row.appendChild(readout);
-      return row;
+      return {
+        row: row,
+        set: function (value) {
+          input.value = String(value);
+          readout.textContent = config.readout(value);
+        }
+      };
     }
 
     if (slide.plan.sliders.length) {
@@ -801,7 +849,9 @@
           readout: plotter.format
         }, function (value) {
           slide.values[config.name] = value;
-        }));
+          // A parameter moved, so the window may need to follow it.
+          slide.fitNext = true;
+        }).row);
       });
       card.appendChild(sliders);
     }
@@ -826,27 +876,30 @@
     };
 
     var mode = currentMode(slide);
-    axes.appendChild(sliderRow(t('range', slide.plan.axis), zoomConfig(slide.view.x),
-      function (value) { slide.view.x = value; }));
+    var xControl = sliderRow(t('range', slide.plan.axis), zoomConfig(slide.view.x),
+      function (value) { slide.view.x = value; slide.fitNext = false; });
+    axes.appendChild(xControl.row);
+    var yControl = null;
 
     if (mode.id === 'series') {
-      axes.appendChild(sliderRow(t('range', 'y'), zoomConfig(slide.view.y),
-        function (value) { slide.view.y = value; }));
+      yControl = sliderRow(t('range', 'y'), zoomConfig(slide.view.y),
+        function (value) { slide.view.y = value; slide.fitNext = false; });
+      axes.appendChild(yControl.row);
     } else if (mode.id === 'surface') {
       axes.appendChild(sliderRow(t('range', mode.second), zoomConfig(slide.view.y),
-        function (value) { slide.view.y = value; }));
+        function (value) { slide.view.y = value; }).row);
     }
 
     if (mode.id !== 'series') {
       axes.appendChild(sliderRow(t('zoom'), zoomConfig(slide.view.zoom || 0),
-        function (value) { slide.view.zoom = value; }));
+        function (value) { slide.view.zoom = value; }).row);
     }
 
     if (mode.id === 'surface' || mode.id === 'parametric3d') {
       axes.appendChild(sliderRow(t('turn'), angleConfig(slide.view.yaw),
-        function (value) { slide.view.yaw = value; }));
+        function (value) { slide.view.yaw = value; }).row);
       axes.appendChild(sliderRow(t('tilt'), angleConfig(slide.view.pitch),
-        function (value) { slide.view.pitch = value; }));
+        function (value) { slide.view.pitch = value; }).row);
     }
     card.appendChild(axes);
 

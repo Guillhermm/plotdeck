@@ -129,6 +129,78 @@ domain of 0 to 10 over time, or 0.01 to 10 under a logarithm, touches zero only 
 edge, so it is left alone rather than spending half the picture where the function does
 not exist. Turning the toggle off fits each axis to the data instead.
 
+**Both windows follow the parameters, through the controls.** Move a parameter and
+the axis sliders move with it: the horizontal one to keep the part of the curve that
+actually does something, the vertical one to hold what the curve reaches inside that
+window. The fit is chosen as a slider position, never as a hidden frame, so the
+controls always describe what is on screen and any fit can be taken back by hand.
+Moving an axis slider yourself turns the fit off for that slide until a parameter
+moves again.
+
+Because the slider is geometric the fit lands on discrete steps, which is also what
+keeps a scale parameter visible: between two steps the curve grows inside a fixed
+frame, and only when it no longer fits does the step, and the control, move.
+
+The horizontal fit takes the smallest window about the centre holding 92% of the
+curve's total variation, which is what keeps a transition on screen when a parameter
+makes it narrow or wide. It may not open the window more than about 4x past what the
+planner chose: a curve that grows without bound puts nearly all of its variation at
+the edges, so the rule alone would zoom out until the interesting part is a vertical
+line.
+
+These rules were chosen by measurement rather than taste. Four strategies were swept
+over eight slides and thirteen parameter values on three articles, scored on how much
+of the curve stayed visible, how much of the frame it filled, and whether the
+interesting horizontal range stayed in view:
+
+| Strategy | Visible | Fill | x kept | Slider moves | Frame moves |
+|---|---|---|---|---|---|
+| Refit every draw | 0.94 | 1.00 | 0.21 | 0 | 94 |
+| Hold and expand | 0.96 | 0.49 | 0.21 | 0 | 27 |
+| Fit through the controls | 0.73 | 0.48 | **0.66** | 41 | 29 |
+
+Refitting on every draw fills the frame perfectly and redraws an identical picture
+while doing it: the curve changed on only 24 of 104 adjustments, which is the bug
+that made sliders look dead. Holding the frame keeps the most on screen but moved it
+silently 27 times without moving a single control. Fitting through the controls keeps
+the interesting horizontal range three times as often, and every one of its frame
+moves is a control move the viewer can see and undo.
+
+Two refinements that seemed obviously right measured worse and were dropped: easing
+towards the answer over several adjustments, and fitting with headroom to spare. Both
+cost visibility on every page tried.
+
+**Refit** pulls the vertical frame back to the current curve.
+
+## A slide
+
+The formula is shown as the page rendered it, copied out of the document, and
+clicking it copies the LaTeX. Under it come the curves, then the controls. A slide
+built from several lines carries a legend naming each curve.
+
+## Controls on a slide
+
+A slide only gets parameter sliders when the equation has parameters, so
+`f(x)=1/(1+e^{-x})` has none and `f(x)=L/(1+e^{-k(x-x_0)})` has three. On the
+Wikipedia article for the logistic function, 11 of the 23 slides carry no parameters
+at all.
+
+Every slide, with parameters or without, gets a span control for each axis: **x range**
+and **y range**. Each one scales its window about the window's own centre, so the
+centre never moves and the curve cannot drift off to a corner the way a pair of typed
+bounds allows. One step is a constant ratio and the ends are 0.01x and 100x the
+measured span, which is four orders of magnitude on a control that typing two numbers
+cannot cover comfortably. The readout is the factor, and the line under the plot gives
+the resulting bounds on both axes.
+
+**0 centered**, on by default and sitting below the plot beside **Refit**, puts zero
+in the middle of both axes rather than the middle of the data. So the logistic function, whose curve runs 0 to 1, gets a vertical
+window of -1.08 to 1.08 with the zero line across the centre, and zooming keeps it
+there. The test is strict: a window only gets recentred when zero lies *inside* it. A
+domain of 0 to 10 over time, or 0.01 to 10 under a logarithm, touches zero only at its
+edge, so it is left alone rather than spending half the picture where the function does
+not exist. Turning the toggle off fits each axis to the data instead.
+
 **The vertical frame also grows on its own.** Holding it still is what makes a scale
 parameter visible, but held too literally it would let a curve climb out of sight. So
 the frame never shrinks by itself and never rescales in step with the data, but when
@@ -213,7 +285,7 @@ is sent anywhere: there is no network call in the extension at all.
 ## Development
 
 ```sh
-npm test          # 124 tests, node:test, no dependencies
+npm test          # 135 tests, node:test, no dependencies
 npm run icons     # regenerates src/images/*.png
 ```
 
@@ -227,4 +299,5 @@ npm run icons     # regenerates src/images/*.png
 - `src/lib/space.js`: projection, normalisation and depth ordering, pure.
 - `src/lib/strings.js`: the drawer's words, per language, pure.
 - `src/lib/session.js`: what to remember about a page and how to put it back, pure.
+- `src/lib/autofit.js`: where the axis controls should sit, pure.
 - `src/content/content.js`: the drawer, in a shadow root.

@@ -58,6 +58,21 @@
     return sorted[lower] + (sorted[upper] - sorted[lower]) * (index - lower);
   }
 
+  /** The band holding the middle of the values, ignoring the extreme tails. */
+  function coreRange(points, low, high) {
+    var ys = points.map(function (p) { return p.y; })
+      .filter(function (y) { return Number.isFinite(y); })
+      .sort(function (a, b) { return a - b; });
+    if (!ys.length) return null;
+    var min = quantile(ys, low === undefined ? 0.05 : low);
+    var max = quantile(ys, high === undefined ? 0.95 : high);
+    if (min === max) {
+      var pad = Math.abs(min) > 1e-9 ? Math.abs(min) * 0.2 : 0.5;
+      return { min: min - pad, max: max + pad };
+    }
+    return { min: min, max: max };
+  }
+
   /**
    * A range that survives asymptotes. Using raw min and max would let a single
    * pole near a division by zero flatten the whole curve into a line.
@@ -215,6 +230,7 @@
     sample: sample,
     grid: grid,
     verticalRange: verticalRange,
+    coreRange: coreRange,
     unionRange: unionRange,
     combinedRange: combinedRange,
     niceStep: niceStep,

@@ -11,6 +11,7 @@ const FILES = [
   'src/lib/space.js',
   'src/lib/strings.js',
   'src/lib/session.js',
+  'src/lib/autofit.js',
   'src/content/content.js'
 ];
 

@@ -61,23 +61,6 @@
     return centerZero(range);
   }
 
-  /**
-   * Grows a window so it holds a range, with room to spare.
-   *
-   * The headroom matters: fitting exactly would put the curve against the edge
-   * after every adjustment, so each further change would need another refit and
-   * growth would read as a series of jumps rather than as growth.
-   */
-  function expandToHold(frame, needed, headroom) {
-    if (!needed) return frame;
-    if (!frame) return needed;
-    if (needed.min >= frame.min && needed.max <= frame.max) return frame;
-    var middle = center(needed);
-    var half = (span(needed) / 2) * (headroom || 1.4);
-    if (!(half > 0)) half = 0.5;
-    return { min: middle - half, max: middle + half };
-  }
-
   function clampPosition(position) {
     if (position < -STEPS) return -STEPS;
     if (position > STEPS) return STEPS;
@@ -90,7 +73,6 @@
     span: span,
     zoom: zoom,
     centerZero: centerZero,
-    expandToHold: expandToHold,
     frameFor: frameFor,
     factorFor: factorFor,
     positionFor: positionFor,
