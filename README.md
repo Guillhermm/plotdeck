@@ -3,7 +3,8 @@
 A Chrome extension (Manifest V3) that reads every equation on a page and draws it,
 with a slider for each parameter. No model, no network, no build step.
 
-Status: working prototype. Verified in Chrome 154 against seven live pages.
+Status: 1.0.0, prepared for the Chrome Web Store and not yet published. Verified in
+Chrome 154 against live pages, with the packaged archive loaded as an extension.
 
 ## Install locally
 
