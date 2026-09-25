@@ -821,7 +821,7 @@
     });
 
     /**
-     * @returns {{row: Element, set: function(number): void}} so a control can be
+     * @returns {{row: Element, set: (value: number) => void}} so a control can be
      *   moved by the fit as well as by hand, and still read correctly.
      */
     function sliderRow(name, config, onInput) {

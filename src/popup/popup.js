@@ -17,14 +17,14 @@ const FILES = [
 
 const els = {
   status: document.getElementById('status'),
-  toggle: document.getElementById('toggle'),
+  toggle: /** @type {HTMLButtonElement} */ (document.getElementById('toggle')),
   stats: document.getElementById('stats'),
   found: document.getElementById('stat-found'),
   plotted: document.getElementById('stat-plotted'),
   rejects: document.getElementById('rejects')
 };
 
-let open = false;
+let deckOpen = false;
 
 async function currentTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -46,10 +46,10 @@ async function send(tabId, message) {
 }
 
 function render(result) {
-  open = !!(result && result.open);
-  els.toggle.textContent = open ? 'Close deck' : 'Scan this page';
+  deckOpen = !!(result && result.open);
+  els.toggle.textContent = deckOpen ? 'Close deck' : 'Scan this page';
   els.rejects.replaceChildren();
-  if (!result || !open) {
+  if (!result || !deckOpen) {
     els.stats.hidden = true;
     els.status.textContent = 'Ready.';
     return;
@@ -79,7 +79,7 @@ async function onToggle() {
   els.toggle.disabled = true;
   try {
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: FILES });
-    const result = open
+    const result = deckOpen
       ? await send(tab.id, { type: 'plotdeck:close' })
       : await send(tab.id, { type: 'plotdeck:open' });
     if (!result) {

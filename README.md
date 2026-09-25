@@ -288,9 +288,52 @@ is sent anywhere: there is no network call in the extension at all.
 ## Development
 
 ```sh
-npm test          # 135 tests, node:test, no dependencies
+npm test          # 145 tests, node:test
+npm run typecheck # tsc over the JavaScript, no emit
+npm run package   # builds dist/plotdeck-<version>.zip for the store
 npm run icons     # regenerates src/images/*.png
 ```
+
+The extension itself ships no dependencies: what reaches the browser is the
+JavaScript in `src/`, unbundled. TypeScript and the type packages are development
+only, and there is no zero-dependency way to type-check JavaScript, which is the
+one thing that made them worth adding.
+
+## Types
+
+The source stays JavaScript and is checked as JavaScript: `checkJs` over JSDoc, with
+`noEmit`, so nothing is compiled and nothing changes shape. Types the checker cannot
+infer are written where they belong, as documentation that happens to be verified:
+`PlotPlan` and `PlanResult` in `plan.js` describe what planning returns, and
+`types/globals.d.ts` declares the module globals by taking their shapes from the
+implementations, so the declarations cannot drift from the code.
+
+It paid for itself on the first run: two `@returns` annotations used Closure syntax
+that is not valid JSDoc and had been silently meaningless, and the popup held a
+top-level `open` that collided with `window.open`.
+
+## Packaging
+
+`npm run package` writes `dist/plotdeck-<version>.zip`, holding the manifest and
+`src/` and nothing else. Tests, tooling, types, configuration and this readme stay
+behind.
+
+Before writing anything it compares the two lists that have to agree: every file the
+extension names, taken from the manifest, the popup's markup and the list of scripts
+the popup injects, and every file the package would contain. A file the code asks for
+but the package would omit fails the build, and so does a file the package would carry
+that nothing loads. That is what catches a new module added to `src/lib` but never
+wired into the popup's injection list.
+
+The archive is written directly with `zlib`, so packaging needs no dependency either.
+It is byte for byte reproducible: the same source always produces the same zip.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs the type check and the tests on every push and pull
+request, then builds the package and keeps it as an artifact. `release.yml` does the
+same on a `v*` tag and refuses to package when the tag and the manifest version
+disagree, which is the mistake that otherwise reaches the store unnoticed.
 
 - `src/lib/latex.js`: normalize, tokenize, parse. Rejects by name.
 - `src/lib/evaluate.js`: tree to number, free symbols, functions applied to an axis.

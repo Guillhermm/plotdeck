@@ -144,7 +144,7 @@
     return localeFor(node.documentElement.getAttribute('lang'));
   }
 
-  /** @returns {function(string, ...*): string} */
+  /** @returns {(key: string, ...args: any[]) => string} */
   function translator(locale) {
     var table = TABLES[locale] || TABLES.en;
     return function (key) {

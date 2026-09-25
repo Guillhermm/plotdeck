@@ -12,16 +12,18 @@ const CURVE = [79, 157, 253, 255];
 const SIZES = [16, 48, 128];
 const OUT_DIR = path.join(__dirname, '..', 'src', 'images');
 
+const CRC_TABLE = (() => {
+  const table = new Int32Array(256);
+  for (let n = 0; n < 256; n += 1) {
+    let c = n;
+    for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    table[n] = c;
+  }
+  return table;
+})();
+
 function crc32(buf) {
-  const table = crc32.table || (crc32.table = (() => {
-    const t = new Int32Array(256);
-    for (let n = 0; n < 256; n += 1) {
-      let c = n;
-      for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-      t[n] = c;
-    }
-    return t;
-  })());
+  const table = CRC_TABLE;
   let crc = -1;
   for (let i = 0; i < buf.length; i += 1) crc = (crc >>> 8) ^ table[(crc ^ buf[i]) & 0xff];
   return (crc ^ -1) >>> 0;

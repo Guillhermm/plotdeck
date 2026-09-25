@@ -3,6 +3,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const latex = require('../src/lib/latex.js');
+
+/** The reason a ParseError carries, which assert.throws hands over untyped. */
+const reasonOf = (err) => /** @type {any} */ (err).reason;
 const { evaluate, freeSymbols, functionsOnAxis } = require('../src/lib/evaluate.js');
 
 const at = (tex, scope) => evaluate(latex.parse(tex), scope);
@@ -96,17 +99,17 @@ test('unsupported notation is rejected by name', () => {
     '\\frac{\\partial f}{\\partial x}': 'unsupported-derivative'
   };
   for (const [tex, reason] of Object.entries(cases)) {
-    assert.throws(() => latex.parse(tex), (err) => err.reason === reason, tex);
+    assert.throws(() => latex.parse(tex), (err) => reasonOf(err) === reason, tex);
   }
 });
 
 test('unknown commands are rejected rather than ignored', () => {
-  assert.throws(() => latex.parse('\\foo{x}'), (err) => err.reason === 'unknown-command');
+  assert.throws(() => latex.parse('\\foo{x}'), (err) => reasonOf(err) === 'unknown-command');
 });
 
 test('comparisons are not functions', () => {
-  assert.throws(() => latex.parse('x < 1'), (err) => err.reason === 'not-a-function');
-  assert.throws(() => latex.parse('x \\leq 1'), (err) => err.reason === 'not-a-function');
+  assert.throws(() => latex.parse('x < 1'), (err) => reasonOf(err) === 'not-a-function');
+  assert.throws(() => latex.parse('x \\leq 1'), (err) => reasonOf(err) === 'not-a-function');
 });
 
 test('trailing input is an error, not silently dropped', () => {

@@ -11,6 +11,37 @@
   var latex = root.PlotDeckLatex || (typeof require === 'function' ? require('./latex.js') : null);
   var evaluate = root.PlotDeckEvaluate || (typeof require === 'function' ? require('./evaluate.js') : null);
 
+  /**
+   * @typedef {Object} PlotSeries
+   * @property {string} label what the line is called
+   * @property {Object} ast its parsed right hand side
+   */
+
+  /**
+   * @typedef {Object} PlotPlan
+   * @property {string} label
+   * @property {PlotSeries[]} series one entry per curve
+   * @property {string} kind equation, expression or system
+   * @property {string} axis the independent variable
+   * @property {string} axisChoice declared, convention, fallback or shared
+   * @property {Object} ast the first series, kept for convenience
+   * @property {Array<{name: string, value: number, min: number, max: number,
+   *   step: number}>} sliders
+   * @property {{min: number, max: number}} domain
+   * @property {string[]} functions those applied to the axis
+   */
+
+  /**
+   * The outcome of planning: either a plan, or the reason there is none.
+   *
+   * @typedef {Object} PlanResult
+   * @property {boolean} ok
+   * @property {PlotPlan} [plan]
+   * @property {string} [reason]
+   * @property {string} [detail]
+   * @property {number[]} [members] which of the given plans a group took
+   */
+
   // Conventional independent variables, most conventional first.
   var AXIS_PREFERENCE = [
     'x', 't', 'theta', 'phi', 'psi', 'eta', 'varphi',
@@ -57,7 +88,7 @@
 
   /**
    * @param {string} tex
-   * @returns {{ok: true, plan: object} | {ok: false, reason: string, detail?: string}}
+   * @returns {PlanResult}
    */
   function plan(tex) {
     var normalized = latex.normalize(tex);
@@ -157,6 +188,10 @@
     }, 0);
   }
 
+  /**
+   * @param {string} tex
+   * @returns {PlanResult}
+   */
   function planExpression(tex) {
     var ast;
     try {
@@ -204,8 +239,8 @@
    * parametrisation gives x_0, x_1, x_2 as functions of the same angle. Read
    * one at a time they are unrelated curves; read together they are the object.
    *
-   * @param {Array<object>} plans plans that already succeeded on their own
-   * @returns {{ok: true, plan: object, members: number[]} | {ok: false, reason: string}}
+   * @param {PlotPlan[]} plans plans that already succeeded on their own
+   * @returns {PlanResult}
    */
   function groupPlans(plans) {
     if (!plans || plans.length < 2) return { ok: false, reason: 'not-a-system' };
@@ -280,6 +315,7 @@
    * equation whose remaining symbol is itself a conventional variable is a
    * surface rather than a family of curves.
    *
+   * @param {PlotPlan} plan
    * @returns {Array<{id: string, label: string, second?: string}>}
    */
   function modesFor(plan) {
