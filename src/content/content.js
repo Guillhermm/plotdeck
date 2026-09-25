@@ -90,6 +90,21 @@
     '.meta { color: #7d8b9a; font-size: 11px; margin-top: 8px; }',
     '.figure-foot { display: flex; align-items: center; gap: 10px; margin-top: 8px; }',
     '.figure-foot .spacer { flex: 1; }',
+    // Shrunk to the drawing, so the camera is placed against the plot's own
+    // corner rather than the card's.
+    '.figure { position: relative; width: max-content; max-width: 100%; }',
+    'button.shot { position: absolute; top: 7px; right: 7px; width: 26px; height: 26px;',
+    '  display: grid; place-items: center; padding: 0; border-radius: 7px;',
+    '  border: 1px solid transparent; background: rgba(13, 17, 23, .55);',
+    '  color: #7d8b9a; opacity: .5; cursor: pointer;',
+    '  transition: opacity .16s ease, color .16s ease, background .16s ease,',
+    '    border-color .16s ease; }',
+    '.figure:hover button.shot { opacity: 1; }',
+    'button.shot:hover:not([disabled]) { color: #e6edf3; border-color: #2c3a4a;',
+    '  background: rgba(13, 17, 23, .92); }',
+    'button.shot:focus-visible { opacity: 1; outline: 2px solid #4f9dfd; outline-offset: 1px; }',
+    'button.shot[disabled] { opacity: .3; }',
+    'button.shot.failed { color: #e3b341; border-color: #e3b341; opacity: 1; }',
     '.warn { color: #e3b341; font-size: 11px; }',
     '.toggle { display: flex; align-items: center; gap: 4px; color: #7d8b9a;',
     '  font-size: 11px; cursor: pointer; user-select: none; }',
@@ -652,6 +667,20 @@
     return drawSeries(slide);
   }
 
+  /** A small line-art camera, drawn rather than fetched. */
+  function cameraIcon() {
+    var icon = svgEl('svg', {
+      width: 15, height: 15, viewBox: '0 0 16 16', fill: 'none',
+      stroke: 'currentColor', 'stroke-width': 1.2,
+      'stroke-linejoin': 'round', 'stroke-linecap': 'round'
+    });
+    icon.appendChild(svgEl('path', {
+      d: 'M1.6 6a1.2 1.2 0 0 1 1.2-1.2h1.8l1-1.9h4.8l1 1.9h1.8A1.2 1.2 0 0 1 14.4 6v6a1.2 1.2 0 0 1-1.2 1.2H2.8A1.2 1.2 0 0 1 1.6 12z'
+    }));
+    icon.appendChild(svgEl('circle', { cx: 8, cy: 8.8, r: 2.6 }));
+    return icon;
+  }
+
   function buildLegend(series) {
     var legend = el('div', 'legend');
     series.forEach(function (item, index) {
@@ -775,8 +804,10 @@
       });
     var refit = el('button', 'mini', t('refit'));
     refit.title = t('refitHint');
-    var savePng = el('button', 'mini', t('savePng'));
+    var savePng = el('button', 'shot');
     savePng.title = t('savePngHint');
+    savePng.setAttribute('aria-label', t('savePng'));
+    savePng.appendChild(cameraIcon());
 
     savePng.addEventListener('click', function () {
       var drawing = figure.querySelector('svg');
@@ -787,12 +818,16 @@
           location.href, slide.plan.label, slide.plan.axis));
         savePng.disabled = false;
       }, function () {
-        warn.textContent = t('saveFailed');
+        // Kept on the control rather than in the warning slot, which belongs
+        // to the plot and may already be saying something about the frame.
+        savePng.title = t('saveFailed');
+        savePng.classList.add('failed');
         savePng.disabled = false;
       });
     });
 
-    var figure = el('div');
+    var figure = el('div', 'figure');
+    figure.appendChild(savePng);
     card.appendChild(figure);
     var meta = el('div', 'meta');
     card.appendChild(meta);
@@ -800,7 +835,6 @@
     // Below the plot, because both of these are about what was just drawn.
     var figureFoot = el('div', 'figure-foot');
     figureFoot.appendChild(refit);
-    figureFoot.appendChild(savePng);
     figureFoot.appendChild(warn);
     figureFoot.appendChild(el('span', 'spacer'));
     figureFoot.appendChild(fitLabel);
@@ -815,7 +849,7 @@
         if (yControl) yControl.set(slide.view.y);
       }
       var drawn = drawPlot(slide);
-      figure.replaceChildren(drawn.svg);
+      figure.replaceChildren(drawn.svg, savePng);
       warn.textContent = drawn.escapes ? t('escapes') : '';
       if (drawn.readout) {
         meta.textContent = drawn.readout;

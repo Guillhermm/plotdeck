@@ -80,11 +80,15 @@ page with a hundred equations costs the same as a page with one.
 - Both ends clamp rather than wrap, and the buttons disable there.
 - Slider positions belong to the slide, so they survive leaving and coming back.
 - "Show on page" scrolls the page to the equation and outlines it.
-- **Save PNG** writes the plot to a file. The drawing is already an SVG this
-  extension wrote, so nothing is captured: it is serialized, painted onto a canvas
-  at twice the size and offered through an ordinary link, with no download
-  permission and nothing of the page included. The name carries where it came
-  from, what it draws and when, as in
+- A camera in the plot's top corner saves the drawing as a PNG. It stays faint
+  until the plot is hovered, so it costs no room: the row beneath the plot has only
+  as much space as **Refit** and the two toggles, and putting the control there made
+  it wrap the moment the frame warning appeared.
+
+  Nothing is captured. The drawing is already an SVG this extension wrote, so it is
+  serialized, painted onto a canvas at twice the size and offered through an ordinary
+  link, with no download permission and nothing of the page included. The name carries
+  where it came from, what it draws and when, as in
   `en-wikipedia-org-wiki-logistic-function_f-x-vs-x_20260924-231500.png`.
 
 ## Language
